@@ -6,7 +6,6 @@
     <title>高登科【靜修校】雲端帳務系統</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     
     <style>
@@ -120,7 +119,7 @@
                         <div class="col-md-3"><label class="form-label">期間模式</label><select class="form-select" id="reportPeriodMode" onchange="updateDateRange()"><option value="thisMonth" selected>本月</option><option value="lastMonth">上月</option><option value="custom">自訂</option></select></div>
                         <div class="col-md-3"><input type="date" class="form-control" id="reportStartDate" onchange="updatePreviewStats()"></div>
                         <div class="col-md-3"><input type="date" class="form-control" id="reportEndDate" onchange="updatePreviewStats()"></div>
-                        <div class="col-md-3"><button class="btn btn-danger w-100" onclick="generatePDF()"><i class="fas fa-file-pdf"></i> 匯出 PDF</button></div>
+                        <div class="col-md-3"><button class="btn btn-success w-100" onclick="exportComplexExcel()"><i class="fas fa-file-excel"></i> 匯出 Excel 完整報表</button></div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6"><div class="card h-100 border-success"><div class="card-header bg-success text-white">收入</div><div class="card-body p-0"><table class="table table-striped mb-0"><tbody id="preview-income-body"></tbody></table></div></div></div>
@@ -140,10 +139,6 @@
                         <div class="col-md-6"><h6>收入分類</h6><div class="input-group mb-2"><input type="text" class="form-control" id="newIncomeCat"><button class="btn btn-outline-success" onclick="addCategory('income')">新增</button></div><div id="incomeCatList"></div></div>
                     </div>
                 </div>
-            </div>
-            <div class="card">
-                <div class="card-header bg-success text-white">Excel 匯出</div>
-                <div class="card-body"><button class="btn btn-success" onclick="exportExcel()"><i class="fas fa-file-excel"></i> 下載 Excel 總表</button></div>
             </div>
         </div>
 
@@ -188,9 +183,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // ▼▼▼ 這裡已經幫您填入您的 Web App 網址 ▼▼▼
+    // ▼▼▼ 您的 Web App 網址 ▼▼▼
     const scriptURL = 'https://script.google.com/macros/s/AKfycbzGnWo-GWlavpYjMb5I6IwCIAsMlSeu2eHou2chlJPJELckyTU7bsln1Ho7F68n2VA-Gw/exec';
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
     let transactions = [];
     let cloudUsers = [];
@@ -204,7 +199,7 @@
 
     function getTodayString() { const n=new Date(); return new Date(n.getTime()-(n.getTimezoneOffset()*60000)).toISOString().slice(0,10); }
 
-    // 1. 登入邏輯 (比對雲端帳號)
+    // 1. 登入邏輯
     document.getElementById('loginForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const u = document.getElementById('loginUser').value.trim();
@@ -217,10 +212,9 @@
         .then(res => {
             if(res.result === 'success') {
                 const users = res.data.users;
-                // 內建超級管理員 (防止雲端是空的無法登入) - 您可以修改這裡的預設密碼
                 let foundUser = users.find(x => x.username === u && String(x.password) === p);
                 
-                // 緊急後門：如果雲端沒資料，可用 admin / 54381017 登入
+                // 緊急後門
                 if(!foundUser && u === 'admin' && p === '54381017') {
                     foundUser = { username: 'admin', role: 'admin', name: '系統預設管理員' };
                 }
@@ -306,13 +300,7 @@
         if(!currentUser) return;
         fetch(scriptURL, {
             method: 'POST',
-            body: JSON.stringify({
-                op: 'add',
-                tableName: 'logs',
-                user: currentUser.username,
-                action: action,
-                detail: detail
-            }),
+            body: JSON.stringify({ op: 'add', tableName: 'logs', user: currentUser.username, action: action, detail: detail }),
             headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
     }
@@ -324,15 +312,9 @@
         let finalDesc = cat === '餐費支出' && document.getElementById('descSelect').value === 'other' ? document.getElementById('descOtherInput').value.trim() : (cat === '餐費支出' ? document.getElementById('descSelect').value : document.getElementById('descInput').value.trim());
         const editId = document.getElementById('editId').value;
         const payload = {
-            op: editId ? 'edit' : 'add',
-            tableName: 'transactions',
-            id: editId ? editId : Date.now(),
-            date: document.getElementById('date').value,
-            type: document.getElementById('type').value,
-            category: cat,
-            amount: document.getElementById('amount').value,
-            desc: finalDesc,
-            createdBy: currentUser.username
+            op: editId ? 'edit' : 'add', tableName: 'transactions', id: editId ? editId : Date.now(),
+            date: document.getElementById('date').value, type: document.getElementById('type').value, category: cat,
+            amount: document.getElementById('amount').value, desc: finalDesc, createdBy: currentUser.username
         };
         sendCloudCommand(payload, editId ? '修改成功' : '新增成功', cancelEdit);
         logToCloud(editId ? '修改交易' : '新增交易', `${cat} $${payload.amount}`);
@@ -350,14 +332,7 @@
         e.preventDefault();
         const newU = document.getElementById('newUsername').value.trim();
         if(cloudUsers.some(x => x.username === newU)) { alert('帳號已存在'); return; }
-        const payload = {
-            op: 'add',
-            tableName: 'users',
-            username: newU,
-            name: document.getElementById('newRealname').value.trim(),
-            password: document.getElementById('newPassword').value,
-            role: document.getElementById('newRole').value
-        };
+        const payload = { op: 'add', tableName: 'users', username: newU, name: document.getElementById('newRealname').value.trim(), password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value };
         sendCloudCommand(payload, '使用者新增成功', () => document.getElementById('newUserForm').reset());
         logToCloud('新增人員', `帳號: ${newU}`);
     });
@@ -371,8 +346,7 @@
     }
 
     function renderUserList() {
-        const tbody = document.getElementById('userListBody');
-        tbody.innerHTML = '';
+        const tbody = document.getElementById('userListBody'); tbody.innerHTML = '';
         cloudUsers.forEach(u => {
             const delBtn = u.username === 'admin' || u.username === currentUser.username ? '-' : `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`;
             tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${delBtn}</td></tr>`;
@@ -380,8 +354,7 @@
     }
 
     function renderLogs() {
-        const tbody = document.getElementById('logListBody');
-        tbody.innerHTML = '';
+        const tbody = document.getElementById('logListBody'); tbody.innerHTML = '';
         cloudLogs.slice().reverse().slice(0, 100).forEach(log => {
             tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`;
         });
@@ -389,9 +362,7 @@
 
     // 5. 畫面渲染
     function renderTable() {
-        const tbody = document.getElementById('transactionList');
-        tbody.innerHTML = '';
-        let balance = 0;
+        const tbody = document.getElementById('transactionList'); tbody.innerHTML = ''; let balance = 0;
         transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
         transactions.forEach(t => {
             if(t.type === 'income') balance += parseInt(t.amount); else balance -= parseInt(t.amount);
@@ -403,6 +374,7 @@
         document.getElementById('currentBalance').innerText = '總餘額: ' + balance.toLocaleString();
     }
     
+    // 編輯、取消、設定、餐費邏輯
     function editTrans(id){ const t=transactions.find(x=>String(x.id)===String(id)); if(!t)return; document.getElementById('editId').value=t.id; document.getElementById('date').value=t.date; document.getElementById('type').value=t.type; document.getElementById('amount').value=t.amount; updateCategoriesFromSettings(); document.getElementById('category').value=t.category; checkMealCategory(); if(t.category==='餐費支出'){const sel=document.getElementById('descSelect'); if(settings.mealOptions.includes(t.desc))sel.value=t.desc; else{sel.value='other';document.getElementById('descOtherInput').value=t.desc;checkMealOption();}}else{document.getElementById('descInput').value=t.desc;} document.getElementById('formTitle').innerText='修改模式'; document.getElementById('formTitle').className='card-header bg-warning text-dark'; document.getElementById('submitBtn').innerHTML='💾 儲存修改'; document.getElementById('submitBtn').className='btn btn-warning w-100'; document.getElementById('cancelEditBtn').classList.remove('d-none'); window.scrollTo({top:0,behavior:'smooth'}); }
     function cancelEdit(){ document.getElementById('accountForm').reset(); document.getElementById('editId').value=''; document.getElementById('date').value=getTodayString(); document.getElementById('formTitle').innerText='新增交易'; document.getElementById('formTitle').className='card-header bg-primary text-white'; document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus-circle"></i> 上傳至雲端'; document.getElementById('submitBtn').className='btn btn-primary w-100'; document.getElementById('cancelEditBtn').classList.add('d-none'); checkMealCategory(); }
     function updateCategoriesFromSettings() { const type = document.getElementById('type').value; const catSelect = document.getElementById('category'); catSelect.innerHTML = ''; settings[type].forEach(cat => catSelect.add(new Option(cat, cat))); }
@@ -411,36 +383,70 @@
     function removeCat(t,i){if(confirm('確定刪除？')){settings[t].splice(i,1);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
     function checkMealCategory() { const isMeal = document.getElementById('category').value === '餐費支出'; document.getElementById('descInput').classList.toggle('d-none', isMeal); document.getElementById('descSelect').classList.toggle('d-none', !isMeal); document.getElementById('descOtherInput').classList.add('d-none'); if (isMeal) { const sel = document.getElementById('descSelect'); sel.innerHTML = ''; settings.mealOptions.forEach(o => sel.add(new Option(o, o))); sel.add(new Option('其他', 'other')); checkMealOption(); } }
     function checkMealOption() { document.getElementById('descOtherInput').classList.toggle('d-none', document.getElementById('descSelect').value !== 'other'); }
+    
     function updateDateRange() { const m=document.getElementById('reportPeriodMode').value, s=document.getElementById('reportStartDate'), e=document.getElementById('reportEndDate'), n=new Date(); if(m==='thisMonth'){s.value=new Date(n.getFullYear(),n.getMonth(),1).toISOString().slice(0,10);e.value=new Date(n.getFullYear(),n.getMonth()+1,0).toISOString().slice(0,10);} else if(m==='lastMonth'){s.value=new Date(n.getFullYear(),n.getMonth()-1,1).toISOString().slice(0,10);e.value=new Date(n.getFullYear(),n.getMonth(),0).toISOString().slice(0,10);} updatePreviewStats(); }
     function getReportData(s,e){ let arr=[...transactions].sort((a,b)=>new Date(a.date)-new Date(b.date)); let open=0, incS={}, expS={}, tI=0, tE=0; settings.income.forEach(c=>incS[c]=0); settings.expense.forEach(c=>expS[c]=0); arr.forEach(t=>{ if(t.date<s){ if(t.type==='income')open+=parseInt(t.amount); else open-=parseInt(t.amount); } else if(t.date>=s && t.date<=e){ if(t.type==='income'){ if(!incS[t.category])incS[t.category]=0; incS[t.category]+=parseInt(t.amount); tI+=parseInt(t.amount); } else{ if(!expS[t.category])expS[t.category]=0; expS[t.category]+=parseInt(t.amount); tE+=parseInt(t.amount); } } }); return {openingBalance:open, periodData:arr.filter(t=>t.date>=s&&t.date<=e), incStats:incS, expStats:expS, totalInc:tI, totalExp:tE}; }
     function updatePreviewStats() { const s=document.getElementById('reportStartDate').value, e=document.getElementById('reportEndDate').value; if(!s||!e)return; const d = getReportData(s,e); const ib=document.getElementById('preview-income-body'), eb=document.getElementById('preview-expense-body'); ib.innerHTML=`<tr><td>上期餘額</td><td class="text-end">${d.openingBalance.toLocaleString()}</td></tr>`; eb.innerHTML=''; for(const[c,v]of Object.entries(d.incStats))if(v>0)ib.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; for(const[c,v]of Object.entries(d.expStats))if(v>0)eb.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; const g=d.totalInc+d.openingBalance; document.getElementById('preview-final-balance').textContent=(g-d.totalExp).toLocaleString(); }
     
-    // PDF 生成
-    function generatePDF(){
-        const s = document.getElementById('reportStartDate').value; const e = document.getElementById('reportEndDate').value; 
-        if(!s||!e){alert('請選擇日期');return;} const d = getReportData(s,e);
-        const printContainer = document.createElement('div');
-        printContainer.style.cssText = "position:absolute; top:0; left:0; width:800px; background:white; z-index:999999; padding:20px; color:black !important; font-family: 'Microsoft JhengHei', sans-serif;";
-        
-        let html = `<h2 style='text-align:center; color:black;'>高登科【靜修校】收支表</h2><p style='text-align:center; color:black;'>統計期間: ${s} ~ ${e}</p>
-        <table style='width:100%; border-collapse:collapse; border:1px solid black; color:black; font-size:12px;'>
-            <thead><tr style='background:#f2f2f2;'><th style='border:1px solid black; padding:5px;'>日期</th><th style='border:1px solid black; padding:5px;'>分類</th><th style='border:1px solid black; padding:5px;'>收入</th><th style='border:1px solid black; padding:5px;'>支出</th><th style='border:1px solid black; padding:5px;'>餘額</th><th style='border:1px solid black; padding:5px;'>備註</th></tr></thead><tbody>`;
-        let bal = d.openingBalance; 
-        html += `<tr><td>${s}</td><td colspan='3' style='text-align:center;'>【上期餘額】</td><td>${bal.toLocaleString()}</td><td></td></tr>`;
-        d.periodData.forEach(t => { if(t.type === 'income') bal += parseInt(t.amount); else bal -= parseInt(t.amount); 
-            html += `<tr><td style='border:1px solid black; padding:4px;'>${t.date}</td><td style='border:1px solid black; padding:4px;'>${t.category}</td><td style='border:1px solid black; padding:4px; text-align:right;'>${t.type==='income'?parseInt(t.amount).toLocaleString():''}</td><td style='border:1px solid black; padding:4px; text-align:right;'>${t.type==='expense'?parseInt(t.amount).toLocaleString():''}</td><td style='border:1px solid black; padding:4px; text-align:right;'>${bal.toLocaleString()}</td><td style='border:1px solid black; padding:4px;'>${t.desc}</td></tr>`; });
-        const grandInc = d.totalInc + d.openingBalance;
-        html += `</tbody></table><div style='margin-top:20px;'><h3 style='text-align:center; color:black;'>收支總表</h3><table style='width:100%; border:1px solid black; border-collapse:collapse; color:black;'><tr><td style='border:1px solid black; padding:5px;'>收入總計</td><td style='border:1px solid black; padding:5px; text-align:right;'>${grandInc.toLocaleString()}</td><td style='border:1px solid black; padding:5px;'>支出總計</td><td style='border:1px solid black; padding:5px; text-align:right;'>${d.totalExp.toLocaleString()}</td></tr><tr style='background:#ffffcc;'><td colspan='2' style='border:1px solid black; padding:10px; font-weight:bold; text-align:center;'>本期結餘</td><td colspan='2' style='border:1px solid black; padding:10px; font-weight:bold; text-align:center; color:blue;'>${(grandInc - d.totalExp).toLocaleString()}</td></tr></table></div>`;
-        printContainer.innerHTML = html; document.body.appendChild(printContainer);
-        setTimeout(() => { html2pdf().set({margin:10,filename:`${s}_靜修收支表.pdf`,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(printContainer).save().then(() => { document.body.removeChild(printContainer); }); }, 800);
-    }
-    
-    function exportExcel() {
-        const s = document.getElementById('reportStartDate').value || '2000-01-01', e = document.getElementById('reportEndDate').value || '2099-12-31';
-        const d = getReportData(s,e);
-        const ws = XLSX.utils.json_to_sheet(d.periodData.map(t=>({日期:t.date, 類型:t.type, 分類:t.category, 金額:t.amount, 備註:t.desc})));
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "帳務資料");
-        XLSX.writeFile(wb, "雲端帳務匯出.xlsx");
+    // 🔥 全新 Excel 複雜報表匯出功能
+    function exportComplexExcel() {
+        const s = document.getElementById('reportStartDate').value;
+        const e = document.getElementById('reportEndDate').value;
+        if(!s || !e) { alert('請選擇日期'); return; }
+
+        const d = getReportData(s, e);
+        const wb = XLSX.utils.book_new();
+
+        // --- Sheet 1: 期間帳務明細 ---
+        let detailData = [['日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']];
+        d.periodData.forEach(t => {
+            detailData.push([
+                t.date,
+                t.type === 'income' ? '收入' : '支出',
+                t.category,
+                t.desc,
+                t.type === 'income' ? parseInt(t.amount) : 0,
+                t.type === 'expense' ? parseInt(t.amount) : 0,
+                t.createdBy || ''
+            ]);
+        });
+        const ws1 = XLSX.utils.aoa_to_sheet(detailData);
+        // 設定欄位寬度
+        ws1['!cols'] = [{wch:12}, {wch:10}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}];
+        XLSX.utils.book_append_sheet(wb, ws1, "期間帳務明細");
+
+        // --- Sheet 2: 收支匯整總表 ---
+        let summaryData = [['統計項目', '金額', '說明']];
+        summaryData.push(['統計期間', `${s} ~ ${e}`, '']);
+        summaryData.push(['期初餘額', d.openingBalance, '結轉上期累積餘額']);
+        summaryData.push(['', '', '']); // 空行
+
+        // 收入區塊
+        summaryData.push(['【收入統計】', '', '']);
+        for(let [cat, amt] of Object.entries(d.incStats)) {
+            if(amt > 0) summaryData.push([cat, amt, '收入分類小計']);
+        }
+        summaryData.push(['收入總計', d.totalInc, '本期總收入']);
+        summaryData.push(['', '', '']); // 空行
+
+        // 支出區塊
+        summaryData.push(['【支出統計】', '', '']);
+        for(let [cat, amt] of Object.entries(d.expStats)) {
+            if(amt > 0) summaryData.push([cat, amt, '支出分類小計']);
+        }
+        summaryData.push(['支出總計', d.totalExp, '本期總支出']);
+        summaryData.push(['', '', '']); // 空行
+
+        // 最終結餘
+        const finalBal = d.openingBalance + d.totalInc - d.totalExp;
+        summaryData.push(['本期結餘', finalBal, '期初 + 總收入 - 總支出']);
+
+        const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+        ws2['!cols'] = [{wch:20}, {wch:15}, {wch:25}];
+        XLSX.utils.book_append_sheet(wb, ws2, "收支匯整總表");
+
+        // 執行下載
+        XLSX.writeFile(wb, `高登科靜修校_報表_${s}_${e}.xlsx`);
     }
 </script>
 </body>
