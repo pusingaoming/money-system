@@ -1,155 +1,373 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>我的雲端記帳本</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f4f9;
-      display: flex;
-      justify-content: center;
-      padding-top: 50px;
-      margin: 0;
-    }
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      width: 90%;
-      max-width: 400px;
-    }
-    h2 { text-align: center; color: #333; margin-bottom: 20px;}
-    .form-group { margin-bottom: 15px; }
-    label { display: block; margin-bottom: 5px; color: #666; font-weight: bold;}
-    input, select, textarea {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-    /* 特別加強金額輸入框的樣式 */
-    input[type="number"] { font-size: 20px; font-weight: bold; color: #2c3e50; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高登科【靜修校】雲端帳務系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     
-    button {
-      width: 100%;
-      padding: 14px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 18px;
-      font-weight: bold;
-      transition: background 0.3s;
-      margin-top: 10px;
-    }
-    button:hover { background-color: #218838; }
-    button:disabled { background-color: #ccc; cursor: not-allowed;}
-    #status { margin-top: 15px; text-align: center; font-size: 16px; min-height: 24px;}
-  </style>
+    <style>
+        /* 背景色: 淡粉紅 */
+        body { background-color: #ffecec; font-family: "Microsoft JhengHei", sans-serif; }
+        .main-title { color: #0099cc; font-weight: bold; text-shadow: 1px 1px 1px rgba(0,0,0,0.1); }
+        .highlight-red { color: #dc3545; }
+        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 10px; margin-bottom: 20px; }
+        .card-header { background-color: #0d6efd; color: white; font-weight: bold; }
+        #amount { background-color: #ffdddd; border-color: #ffcccc; font-weight: bold; }
+        .sortable { cursor: pointer; user-select: none; }
+        .sortable:hover { background-color: #f1f1f1; }
+        .sort-icon { font-size: 0.8em; margin-left: 5px; color: #aaa; }
+        .sort-active { color: #0d6efd; }
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,236,236, 0.98); z-index: 9999; display: flex; justify-content: center; align-items: center; }
+        .d-none { display: none !important; }
+        
+        /* 讀取中的遮罩 */
+        #loading-overlay { 
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: rgba(0,0,0,0.5); z-index: 10000; 
+            display: none; justify-content: center; align-items: center; color: white; flex-direction: column;
+        }
+        .spinner-border { width: 3rem; height: 3rem; }
+    </style>
 </head>
 <body>
 
-  <div class="container">
-    <h2>💰 雲端記帳本</h2>
-    <form id="accountingForm">
-      
-      <div class="form-group">
-        <label>日期</label>
-        <input type="date" name="date" required id="dateInput">
-      </div>
+<div id="loading-overlay">
+    <div class="spinner-border text-light mb-3" role="status"></div>
+    <h4 id="loading-text">資料同步中...</h4>
+</div>
 
-      <div class="form-group">
-        <label>類型</label>
-        <select name="type">
-          <option value="支出">支出 💸</option>
-          <option value="收入">收入 💰</option>
-        </select>
-      </div>
+<div id="login-overlay">
+    <div class="card p-4" style="width: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div class="text-center mb-3">
+            <h3 class="main-title">系統登入</h3>
+            <small class="text-muted">高登科<span class="highlight-red">【靜修校】</span>雲端帳務</small>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label">帳號</label>
+                <input type="text" class="form-control" id="loginUser" required value="admin">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">密碼</label>
+                <input type="password" class="form-control" id="loginPass" required placeholder="預設: 54381017">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">登入並連線資料庫</button>
+            <div id="loginError" class="text-danger text-center mt-2 small"></div>
+        </form>
+    </div>
+</div>
 
-      <div class="form-group">
-        <label>項目</label>
-        <input type="text" name="item" required placeholder="例如：午餐、加油">
-      </div>
+<div class="container py-4" id="main-app" style="display: none;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="main-title m-0"><i class="fas fa-cloud"></i> 高登科<span class="highlight-red">【靜修校】</span>雲端帳務</h2>
+        <div>
+            <span class="me-2 text-secondary"><i class="fas fa-user-circle"></i> <span id="displayUsername">User</span></span>
+            <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">登出</button>
+        </div>
+    </div>
 
-      <div class="form-group">
-        <label>金額</label>
-        <input type="number" name="amount" required placeholder="0" inputmode="numeric">
-      </div>
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#input"><i class="fas fa-pen"></i> 收支登錄</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#report" onclick="updateDateRange()"><i class="fas fa-chart-pie"></i> 報表匯整</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#manage"><i class="fas fa-cogs"></i> 設定</button></li>
+    </ul>
 
-      <div class="form-group">
-        <label>備註 (選填)</label>
-        <textarea name="note" rows="2" placeholder="詳細說明..."></textarea>
-      </div>
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="input">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header" id="formTitle">新增交易</div>
+                        <div class="card-body">
+                            <form id="accountForm">
+                                <input type="hidden" id="editId">
+                                <div class="mb-3"><label class="form-label">日期</label><input type="date" class="form-control" id="date" required></div>
+                                <div class="mb-3"><label class="form-label">收支類型</label><select class="form-select" id="type" onchange="updateCategoriesFromSettings()" required><option value="expense" selected>支出</option><option value="income">收入</option></select></div>
+                                <div class="mb-3"><label class="form-label">項目分類</label><select class="form-select" id="category" required onchange="checkMealCategory()"></select></div>
+                                <div class="mb-3"><label class="form-label">金額</label><input type="number" class="form-control" id="amount" placeholder="輸入金額" required></div>
+                                <div class="mb-3"><label class="form-label">內容 (備註)</label><input type="text" class="form-control" id="descInput"><select class="form-select d-none" id="descSelect" onchange="checkMealOption()"></select><input type="text" class="form-control mt-2 d-none" id="descOtherInput" placeholder="店家名稱"></div>
+                                <button type="submit" class="btn btn-primary w-100" id="submitBtn"><i class="fas fa-plus-circle"></i> 上傳至雲端</button>
+                                <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="cancelEditBtn" onclick="cancelEdit()">取消修改</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-list"></i> 雲端資料列表 <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄 重新整理</button></span>
+                            <span id="currentBalance" class="badge bg-warning text-dark">0</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                                <table class="table table-hover table-sm sticky-top">
+                                    <thead class="table-light"><tr><th onclick="sortTable('date')">日期</th><th>分類</th><th>內容</th><th class="text-end">收入</th><th class="text-end">支出</th><th>操作</th></tr></thead>
+                                    <tbody id="transactionList"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-      <button type="submit" id="submitBtn">送出紀錄</button>
-      <div id="status"></div>
-    </form>
-  </div>
+        <div class="tab-pane fade" id="report">
+            <div class="card border-info">
+                <div class="card-header bg-info text-dark fw-bold">期間報表統計</div>
+                <div class="card-body bg-white">
+                    <div class="row g-3 align-items-end mb-4 border-bottom pb-3">
+                        <div class="col-md-3"><label class="form-label">期間模式</label><select class="form-select" id="reportPeriodMode" onchange="updateDateRange()"><option value="thisMonth" selected>本月</option><option value="lastMonth">上月</option><option value="custom">自訂</option></select></div>
+                        <div class="col-md-3"><input type="date" class="form-control" id="reportStartDate" onchange="updatePreviewStats()"></div>
+                        <div class="col-md-3"><input type="date" class="form-control" id="reportEndDate" onchange="updatePreviewStats()"></div>
+                        <div class="col-md-3"><button class="btn btn-danger w-100" onclick="generatePDF()"><i class="fas fa-file-pdf"></i> 匯出 PDF</button></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6"><div class="card h-100 border-success"><div class="card-header bg-success text-white">收入</div><div class="card-body p-0"><table class="table table-striped mb-0"><tbody id="preview-income-body"></tbody></table></div></div></div>
+                        <div class="col-md-6"><div class="card h-100 border-danger"><div class="card-header bg-danger text-white">支出</div><div class="card-body p-0"><table class="table table-striped mb-0"><tbody id="preview-expense-body"></tbody></table></div></div></div>
+                    </div>
+                    <div class="alert alert-secondary text-center fw-bold">本期結餘: <span id="preview-final-balance" class="text-primary fs-5">0</span></div>
+                </div>
+            </div>
+        </div>
 
-  <script>
-    // ▼▼▼ 這裡已經幫您填好剛剛提供的網址了 ▼▼▼
+        <div class="tab-pane fade" id="manage">
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">收支項目分類 (本機設定)</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 border-end"><h6>支出分類</h6><div class="input-group mb-2"><input type="text" class="form-control" id="newExpenseCat"><button class="btn btn-outline-danger" onclick="addCategory('expense')">新增</button></div><div id="expenseCatList"></div></div>
+                        <div class="col-md-6"><h6>收入分類</h6><div class="input-group mb-2"><input type="text" class="form-control" id="newIncomeCat"><button class="btn btn-outline-success" onclick="addCategory('income')">新增</button></div><div id="incomeCatList"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header bg-success text-white">Excel 匯出</div>
+                <div class="card-body"><button class="btn btn-success" onclick="exportExcel()"><i class="fas fa-file-excel"></i> 下載 Excel 總表</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // ▼▼▼ 您的專屬雲端網址 ▼▼▼
     const scriptURL = 'https://script.google.com/macros/s/AKfycbzGnWo-GWlavpYjMb5I6IwCIAsMlSeu2eHou2chlJPJELckyTU7bsln1Ho7F68n2VA-Gw/exec';
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-    const form = document.forms['accountingForm'];
-    const submitBtn = document.getElementById('submitBtn');
-    const statusMsg = document.getElementById('status');
+    // 資料變數 (改為從雲端抓取)
+    let transactions = [];
+    let currentUser = null;
+    let settings = JSON.parse(localStorage.getItem('accSettings')) || {
+        expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"],
+        income: ["入帳(零用金)", "學生轉入餐費", "其他收入"],
+        mealOptions: ["天食鍋燒", "B鴨董", "來碗粥", "飯卷", "水餃峰", "太祖魷魚羮", "八方鍋胋", "阿胖食堂", "點心"]
+    };
 
-    // 進入網頁時，自動填入今天日期
-    document.getElementById('dateInput').valueAsDate = new Date();
+    // 1. 初始化與登入
+    function getTodayString() { const n=new Date(); return new Date(n.getTime()-(n.getTimezoneOffset()*60000)).toISOString().slice(0,10); }
 
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      
-      // 按下按鈕後的狀態改變
-      submitBtn.disabled = true;
-      submitBtn.innerText = "資料傳送中...";
-      statusMsg.innerText = "";
-      statusMsg.style.color = '#666';
-
-      const formData = new FormData(form);
-      const data = Object.fromEntries(formData.entries());
-
-      fetch(scriptURL, {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-      })
-      .then(response => response.json())
-      .then(result => {
-        if(result.result === 'success'){
-            statusMsg.style.color = 'green';
-            statusMsg.innerText = "✅ 記帳成功！";
-            
-            // 成功後清空表單，但保留日期
-            form.reset(); 
-            document.getElementById('dateInput').valueAsDate = new Date(); 
-        } else {
-            throw new Error('Script error');
-        }
-      })
-      .catch(error => {
-        console.error('Error!', error.message);
-        statusMsg.style.color = 'red';
-        statusMsg.innerText = "❌ 發生錯誤，請檢查網路。";
-      })
-      .finally(() => {
-        // 恢復按鈕狀態
-        submitBtn.disabled = false;
-        submitBtn.innerText = "送出紀錄";
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const u = document.getElementById('loginUser').value;
+        const p = document.getElementById('loginPass').value;
         
-        // 3秒後自動清除成功訊息，讓畫面乾淨
-        setTimeout(() => {
-             if(statusMsg.innerText.includes("成功")) statusMsg.innerText = "";
-        }, 3000);
-      });
+        // 預設密碼驗證
+        if(p === '54381017' || p === 'admin') {
+            currentUser = { name: '管理員', username: u };
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('displayUsername').innerText = currentUser.name;
+            document.getElementById('date').value = getTodayString();
+            renderSettings();
+            updateCategoriesFromSettings();
+            fetchCloudData(); // 🔥 登入成功後，立刻從雲端抓資料
+        } else {
+            document.getElementById('loginError').innerText = '密碼錯誤 (預設 54381017)';
+        }
     });
-  </script>
+
+    // 2. 雲端核心功能 (Fetch)
+    function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading-overlay').style.display = 'flex'; }
+    function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+
+    // 讀取資料 (Read)
+    function fetchCloudData() {
+        showLoading('正在從雲端下載帳務資料...');
+        fetch(scriptURL)
+        .then(res => res.json())
+        .then(res => {
+            if(res.result === 'success') {
+                transactions = res.data; // 更新本地資料
+                renderTable();
+                updatePreviewStats();
+            } else {
+                console.error('API Error:', res);
+                // 容錯：如果是第一次使用，資料可能是空的，這不算是嚴重錯誤
+                if(res.message && res.message.includes('ID not found')) return;
+                alert('讀取失敗: ' + (res.message || '未知錯誤'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('連線錯誤，請檢查網路或確認 Apps Script 部署是否正確。');
+        })
+        .finally(() => hideLoading());
+    }
+
+    // 傳送資料 (Add / Edit / Delete)
+    function sendCloudCommand(payload, successMsg) {
+        showLoading('資料同步中...');
+        fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        })
+        .then(res => res.json())
+        .then(res => {
+            if(res.result === 'success') {
+                fetchCloudData(); // 成功後重新抓取
+                if(successMsg) alert(successMsg);
+                if(payload.op === 'add' || payload.op === 'edit') cancelEdit();
+            } else {
+                alert('操作失敗: ' + res.message);
+            }
+        })
+        .catch(err => alert('連線錯誤'))
+        .finally(() => hideLoading());
+    }
+
+    // 3. 表單提交 (新增/修改)
+    document.getElementById('accountForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cat = document.getElementById('category').value;
+        let finalDesc = cat === '餐費支出' && document.getElementById('descSelect').value === 'other' ? document.getElementById('descOtherInput').value.trim() : (cat === '餐費支出' ? document.getElementById('descSelect').value : document.getElementById('descInput').value.trim());
+        
+        const editId = document.getElementById('editId').value;
+        const payload = {
+            op: editId ? 'edit' : 'add',
+            id: editId ? editId : Date.now(),
+            date: document.getElementById('date').value,
+            type: document.getElementById('type').value,
+            category: cat,
+            amount: document.getElementById('amount').value,
+            desc: finalDesc,
+            createdBy: currentUser.username
+        };
+
+        sendCloudCommand(payload, editId ? '修改成功' : '新增成功');
+    });
+
+    // 4. 刪除與編輯準備
+    function deleteTrans(id) {
+        if(confirm('確定要從雲端刪除此筆資料嗎？(無法復原)')) {
+            sendCloudCommand({ op: 'delete', id: id }, '刪除成功');
+        }
+    }
+
+    function editTrans(id) {
+        const t = transactions.find(x => String(x.id) === String(id));
+        if(!t) return;
+        document.getElementById('editId').value = t.id;
+        document.getElementById('date').value = t.date;
+        document.getElementById('type').value = t.type;
+        document.getElementById('amount').value = t.amount;
+        updateCategoriesFromSettings();
+        document.getElementById('category').value = t.category;
+        checkMealCategory();
+        
+        if (t.category === '餐費支出') {
+            const sel = document.getElementById('descSelect');
+            if (settings.mealOptions.includes(t.desc)) sel.value = t.desc;
+            else { sel.value = 'other'; document.getElementById('descOtherInput').value = t.desc; checkMealOption(); }
+        } else {
+            document.getElementById('descInput').value = t.desc;
+        }
+
+        document.getElementById('formTitle').innerText = '修改模式';
+        document.getElementById('formTitle').className = 'card-header bg-warning text-dark';
+        document.getElementById('submitBtn').innerHTML = '💾 儲存修改';
+        document.getElementById('submitBtn').className = 'btn btn-warning w-100';
+        document.getElementById('cancelEditBtn').classList.remove('d-none');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+        document.getElementById('accountForm').reset();
+        document.getElementById('editId').value = '';
+        document.getElementById('date').value = getTodayString();
+        document.getElementById('formTitle').innerText = '新增交易';
+        document.getElementById('formTitle').className = 'card-header bg-primary text-white';
+        document.getElementById('submitBtn').innerHTML = '<i class="fas fa-plus-circle"></i> 上傳至雲端';
+        document.getElementById('submitBtn').className = 'btn btn-primary w-100';
+        document.getElementById('cancelEditBtn').classList.add('d-none');
+        checkMealCategory();
+    }
+
+    // 5. 畫面渲染與工具
+    function renderTable() {
+        const tbody = document.getElementById('transactionList');
+        tbody.innerHTML = '';
+        let balance = 0;
+        // 排序
+        transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
+        
+        transactions.forEach(t => {
+            if(t.type === 'income') balance += parseInt(t.amount); else balance -= parseInt(t.amount);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${t.date}</td>
+                <td><span class="badge bg-light text-dark border">${t.category}</span></td>
+                <td>${t.desc}</td>
+                <td class="text-end text-success">${t.type==='income'? parseInt(t.amount).toLocaleString():''}</td>
+                <td class="text-end text-danger">${t.type==='expense'? parseInt(t.amount).toLocaleString():''}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editTrans('${t.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTrans('${t.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('currentBalance').innerText = '總餘額: ' + balance.toLocaleString();
+    }
+
+    // 設定與其他輔助函式
+    function updateCategoriesFromSettings() { const type = document.getElementById('type').value; const catSelect = document.getElementById('category'); catSelect.innerHTML = ''; settings[type].forEach(cat => catSelect.add(new Option(cat, cat))); }
+    function renderSettings() { 
+        const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; 
+        r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); 
+    }
+    function addCategory(t){ const v=document.getElementById(t==='expense'?'newExpenseCat':'newIncomeCat').value.trim(); if(v){settings[t].push(v);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
+    function removeCat(t,i){if(confirm('確定刪除？')){settings[t].splice(i,1);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
+    function checkMealCategory() { const isMeal = document.getElementById('category').value === '餐費支出'; document.getElementById('descInput').classList.toggle('d-none', isMeal); document.getElementById('descSelect').classList.toggle('d-none', !isMeal); document.getElementById('descOtherInput').classList.add('d-none'); if (isMeal) { const sel = document.getElementById('descSelect'); sel.innerHTML = ''; settings.mealOptions.forEach(o => sel.add(new Option(o, o))); sel.add(new Option('其他', 'other')); checkMealOption(); } }
+    function checkMealOption() { document.getElementById('descOtherInput').classList.toggle('d-none', document.getElementById('descSelect').value !== 'other'); }
+    
+    // 報表 PDF/Excel 功能
+    function updateDateRange() { const m=document.getElementById('reportPeriodMode').value, s=document.getElementById('reportStartDate'), e=document.getElementById('reportEndDate'), n=new Date(); if(m==='thisMonth'){s.value=new Date(n.getFullYear(),n.getMonth(),1).toISOString().slice(0,10);e.value=new Date(n.getFullYear(),n.getMonth()+1,0).toISOString().slice(0,10);} else if(m==='lastMonth'){s.value=new Date(n.getFullYear(),n.getMonth()-1,1).toISOString().slice(0,10);e.value=new Date(n.getFullYear(),n.getMonth(),0).toISOString().slice(0,10);} updatePreviewStats(); }
+    function getReportData(s,e){ let arr=[...transactions].sort((a,b)=>new Date(a.date)-new Date(b.date)); let open=0, incS={}, expS={}, tI=0, tE=0; settings.income.forEach(c=>incS[c]=0); settings.expense.forEach(c=>expS[c]=0); arr.forEach(t=>{ if(t.date<s){ if(t.type==='income')open+=parseInt(t.amount); else open-=parseInt(t.amount); } else if(t.date>=s && t.date<=e){ if(t.type==='income'){ if(!incS[t.category])incS[t.category]=0; incS[t.category]+=parseInt(t.amount); tI+=parseInt(t.amount); } else{ if(!expS[t.category])expS[t.category]=0; expS[t.category]+=parseInt(t.amount); tE+=parseInt(t.amount); } } }); return {openingBalance:open, periodData:arr.filter(t=>t.date>=s&&t.date<=e), incStats:incS, expStats:expS, totalInc:tI, totalExp:tE}; }
+    function updatePreviewStats() { const s=document.getElementById('reportStartDate').value, e=document.getElementById('reportEndDate').value; if(!s||!e)return; const d = getReportData(s,e); const ib=document.getElementById('preview-income-body'), eb=document.getElementById('preview-expense-body'); ib.innerHTML=`<tr><td>上期餘額</td><td class="text-end">${d.openingBalance.toLocaleString()}</td></tr>`; eb.innerHTML=''; for(const[c,v]of Object.entries(d.incStats))if(v>0)ib.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; for(const[c,v]of Object.entries(d.expStats))if(v>0)eb.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; const g=d.totalInc+d.openingBalance; document.getElementById('preview-final-balance').textContent=(g-d.totalExp).toLocaleString(); }
+    function generatePDF(){
+        const s = document.getElementById('reportStartDate').value; const e = document.getElementById('reportEndDate').value; 
+        if(!s||!e){alert('請選擇日期');return;} const d = getReportData(s,e);
+        const printContainer = document.createElement('div'); printContainer.style.cssText = "position:absolute; top:0; left:0; width:100%; min-height:100vh; background:white; z-index:999999; padding:20px; color:black;";
+        let html = `<h2 style='text-align:center;'>高登科【靜修校】收支表</h2><p style='text-align:center;'>${s} ~ ${e}</p><table style='width:100%; border-collapse:collapse; border:1px solid black;'><thead><tr style='background:#eee;'><th style='border:1px solid black;'>日期</th><th style='border:1px solid black;'>分類</th><th style='border:1px solid black;'>收</th><th style='border:1px solid black;'>支</th><th style='border:1px solid black;'>餘</th><th style='border:1px solid black;'>備註</th></tr></thead><tbody>`;
+        let bal = d.openingBalance; html += `<tr><td>${s}</td><td colspan='3' style='text-align:center;'>【上期餘額】</td><td>${bal}</td><td></td></tr>`;
+        d.periodData.forEach(t => { if(t.type === 'income') bal += parseInt(t.amount); else bal -= parseInt(t.amount); html += `<tr><td style='border:1px solid black;'>${t.date}</td><td style='border:1px solid black;'>${t.category}</td><td style='border:1px solid black;'>${t.type==='income'?t.amount:''}</td><td style='border:1px solid black;'>${t.type==='expense'?t.amount:''}</td><td style='border:1px solid black;'>${bal}</td><td style='border:1px solid black;'>${t.desc}</td></tr>`; });
+        html += `</tbody></table>`;
+        printContainer.innerHTML = html; document.body.appendChild(printContainer);
+        html2pdf().from(printContainer).save(`${s}_報表.pdf`).then(() => document.body.removeChild(printContainer));
+    }
+    function exportExcel() {
+        const s = document.getElementById('reportStartDate').value || '2000-01-01', e = document.getElementById('reportEndDate').value || '2099-12-31';
+        const d = getReportData(s,e);
+        const ws = XLSX.utils.json_to_sheet(d.periodData.map(t=>({日期:t.date, 類型:t.type, 分類:t.category, 金額:t.amount, 備註:t.desc})));
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "帳務資料");
+        XLSX.writeFile(wb, "雲端帳務匯出.xlsx");
+    }
+</script>
 </body>
 </html>
