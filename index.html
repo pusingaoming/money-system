@@ -10,26 +10,21 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     
     <style>
-        /* 背景色: 淡粉紅 */
         body { background-color: #ffecec; font-family: "Microsoft JhengHei", sans-serif; }
         .main-title { color: #0099cc; font-weight: bold; text-shadow: 1px 1px 1px rgba(0,0,0,0.1); }
         .highlight-red { color: #dc3545; }
         .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 10px; margin-bottom: 20px; }
         .card-header { background-color: #0d6efd; color: white; font-weight: bold; }
         #amount { background-color: #ffdddd; border-color: #ffcccc; font-weight: bold; }
-        .sortable { cursor: pointer; user-select: none; }
-        .sortable:hover { background-color: #f1f1f1; }
-        .sort-icon { font-size: 0.8em; margin-left: 5px; color: #aaa; }
-        .sort-active { color: #0d6efd; }
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,236,236, 0.98); z-index: 9999; display: flex; justify-content: center; align-items: center; }
         .d-none { display: none !important; }
         
-        /* 讀取中的遮罩 */
-        #loading-overlay { 
-            position: fixed; top:0; left:0; width:100%; height:100%; 
-            background: rgba(0,0,0,0.5); z-index: 10000; 
-            display: none; justify-content: center; align-items: center; color: white; flex-direction: column;
+        /* 讀取與登入遮罩 */
+        #loading-overlay, #login-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
         }
+        #loading-overlay { background: rgba(0,0,0,0.5); color: white; flex-direction: column; display: none;}
+        #login-overlay { background: rgba(255,236,236, 0.98); }
         .spinner-border { width: 3rem; height: 3rem; }
     </style>
 </head>
@@ -49,11 +44,11 @@
         <form id="loginForm">
             <div class="mb-3">
                 <label class="form-label">帳號</label>
-                <input type="text" class="form-control" id="loginUser" required value="admin">
+                <input type="text" class="form-control" id="loginUser" required placeholder="請輸入帳號">
             </div>
             <div class="mb-3">
                 <label class="form-label">密碼</label>
-                <input type="password" class="form-control" id="loginPass" required placeholder="預設: 54381017">
+                <input type="password" class="form-control" id="loginPass" required placeholder="請輸入密碼">
             </div>
             <button type="submit" class="btn btn-primary w-100">登入並連線資料庫</button>
             <div id="loginError" class="text-danger text-center mt-2 small"></div>
@@ -74,6 +69,8 @@
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#input"><i class="fas fa-pen"></i> 收支登錄</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#report" onclick="updateDateRange()"><i class="fas fa-chart-pie"></i> 報表匯整</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#manage"><i class="fas fa-cogs"></i> 設定</button></li>
+        <li class="nav-item d-none" id="adminTab"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#users"><i class="fas fa-users-cog"></i> 使用者管理</button></li>
+        <li class="nav-item d-none" id="logTab"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#logs"><i class="fas fa-history"></i> 操作紀錄</button></li>
     </ul>
 
     <div class="tab-content">
@@ -105,7 +102,7 @@
                         <div class="card-body">
                             <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                                 <table class="table table-hover table-sm sticky-top">
-                                    <thead class="table-light"><tr><th onclick="sortTable('date')">日期</th><th>分類</th><th>內容</th><th class="text-end">收入</th><th class="text-end">支出</th><th>操作</th></tr></thead>
+                                    <thead class="table-light"><tr><th>日期</th><th>分類</th><th>內容</th><th class="text-end">收入</th><th class="text-end">支出</th><th>操作</th></tr></thead>
                                     <tbody id="transactionList"></tbody>
                                 </table>
                             </div>
@@ -136,7 +133,7 @@
 
         <div class="tab-pane fade" id="manage">
             <div class="card mb-4">
-                <div class="card-header bg-secondary text-white">收支項目分類 (本機設定)</div>
+                <div class="card-header bg-secondary text-white">收支項目分類</div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 border-end"><h6>支出分類</h6><div class="input-group mb-2"><input type="text" class="form-control" id="newExpenseCat"><button class="btn btn-outline-danger" onclick="addCategory('expense')">新增</button></div><div id="expenseCatList"></div></div>
@@ -149,18 +146,55 @@
                 <div class="card-body"><button class="btn btn-success" onclick="exportExcel()"><i class="fas fa-file-excel"></i> 下載 Excel 總表</button></div>
             </div>
         </div>
+
+        <div class="tab-pane fade" id="users">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white"><i class="fas fa-users-cog"></i> 雲端使用者帳號管理</div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">新增使用者</h6>
+                                    <form id="newUserForm">
+                                        <div class="mb-2"><input type="text" class="form-control" id="newUsername" placeholder="帳號 (ID)" required></div>
+                                        <div class="mb-2"><input type="text" class="form-control" id="newRealname" placeholder="顯示名稱" required></div>
+                                        <div class="mb-2"><input type="password" class="form-control" id="newPassword" placeholder="密碼" required></div>
+                                        <div class="mb-2"><select class="form-select" id="newRole"><option value="user">一般使用者</option><option value="admin">管理者</option></select></div>
+                                        <button type="submit" class="btn btn-primary w-100">建立雲端帳號</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8"><table class="table table-bordered"><thead><tr><th>帳號</th><th>名稱</th><th>權限</th><th>操作</th></tr></thead><tbody id="userListBody"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="logs">
+            <div class="card border-secondary">
+                <div class="card-header bg-secondary text-white"><i class="fas fa-history"></i> 雲端操作紀錄 (唯讀)</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm" style="font-size: 0.85rem;"><thead><tr><th style="width:160px;">時間</th><th>操作人員</th><th>動作</th><th>詳情</th></tr></thead><tbody id="logListBody"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // ▼▼▼ 您的專屬雲端網址 ▼▼▼
+    // ▼▼▼ 這裡已經幫您填入您的 Web App 網址 ▼▼▼
     const scriptURL = 'https://script.google.com/macros/s/AKfycbzGnWo-GWlavpYjMb5I6IwCIAsMlSeu2eHou2chlJPJELckyTU7bsln1Ho7F68n2VA-Gw/exec';
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-    // 資料變數 (改為從雲端抓取)
     let transactions = [];
+    let cloudUsers = [];
+    let cloudLogs = [];
     let currentUser = null;
     let settings = JSON.parse(localStorage.getItem('accSettings')) || {
         expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"],
@@ -168,59 +202,87 @@
         mealOptions: ["天食鍋燒", "B鴨董", "來碗粥", "飯卷", "水餃峰", "太祖魷魚羮", "八方鍋胋", "阿胖食堂", "點心"]
     };
 
-    // 1. 初始化與登入
     function getTodayString() { const n=new Date(); return new Date(n.getTime()-(n.getTimezoneOffset()*60000)).toISOString().slice(0,10); }
 
+    // 1. 登入邏輯 (比對雲端帳號)
     document.getElementById('loginForm').addEventListener('submit', (e) => {
         e.preventDefault();
-        const u = document.getElementById('loginUser').value;
-        const p = document.getElementById('loginPass').value;
+        const u = document.getElementById('loginUser').value.trim();
+        const p = document.getElementById('loginPass').value.trim();
         
-        // 預設密碼驗證
-        if(p === '54381017' || p === 'admin') {
-            currentUser = { name: '管理員', username: u };
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            document.getElementById('displayUsername').innerText = currentUser.name;
-            document.getElementById('date').value = getTodayString();
-            renderSettings();
-            updateCategoriesFromSettings();
-            fetchCloudData(); // 🔥 登入成功後，立刻從雲端抓資料
-        } else {
-            document.getElementById('loginError').innerText = '密碼錯誤 (預設 54381017)';
-        }
-    });
-
-    // 2. 雲端核心功能 (Fetch)
-    function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading-overlay').style.display = 'flex'; }
-    function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
-
-    // 讀取資料 (Read)
-    function fetchCloudData() {
-        showLoading('正在從雲端下載帳務資料...');
+        showLoading('正在驗證帳號...');
+        
         fetch(scriptURL)
         .then(res => res.json())
         .then(res => {
             if(res.result === 'success') {
-                transactions = res.data; // 更新本地資料
-                renderTable();
-                updatePreviewStats();
+                const users = res.data.users;
+                // 內建超級管理員 (防止雲端是空的無法登入) - 您可以修改這裡的預設密碼
+                let foundUser = users.find(x => x.username === u && String(x.password) === p);
+                
+                // 緊急後門：如果雲端沒資料，可用 admin / 54381017 登入
+                if(!foundUser && u === 'admin' && p === '54381017') {
+                    foundUser = { username: 'admin', role: 'admin', name: '系統預設管理員' };
+                }
+
+                if(foundUser) {
+                    currentUser = foundUser;
+                    loginSuccess();
+                } else {
+                    document.getElementById('loginError').innerText = '帳號或密碼錯誤';
+                }
             } else {
-                console.error('API Error:', res);
-                // 容錯：如果是第一次使用，資料可能是空的，這不算是嚴重錯誤
-                if(res.message && res.message.includes('ID not found')) return;
-                alert('讀取失敗: ' + (res.message || '未知錯誤'));
+                alert('連線失敗');
             }
         })
-        .catch(err => {
-            console.error(err);
-            alert('連線錯誤，請檢查網路或確認 Apps Script 部署是否正確。');
+        .catch(err => { console.error(err); alert('網路錯誤'); })
+        .finally(() => hideLoading());
+    });
+
+    function loginSuccess() {
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('main-app').style.display = 'block';
+        document.getElementById('displayUsername').innerText = `${currentUser.name} (${currentUser.role==='admin'?'管理員':'使用者'})`;
+        document.getElementById('date').value = getTodayString();
+        
+        if(currentUser.role === 'admin') {
+            document.getElementById('adminTab').classList.remove('d-none');
+            document.getElementById('logTab').classList.remove('d-none');
+        }
+        
+        renderSettings();
+        updateCategoriesFromSettings();
+        fetchCloudData();
+        logToCloud('登入', '使用者登入系統');
+    }
+
+    // 2. 雲端通訊
+    function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading-overlay').style.display = 'flex'; }
+    function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+
+    function fetchCloudData() {
+        showLoading('同步雲端資料中...');
+        fetch(scriptURL)
+        .then(res => res.json())
+        .then(res => {
+            if(res.result === 'success') {
+                transactions = res.data.transactions;
+                cloudUsers = res.data.users;
+                cloudLogs = res.data.logs;
+                
+                renderTable();
+                updatePreviewStats();
+                if(currentUser && currentUser.role === 'admin') {
+                    renderUserList();
+                    renderLogs();
+                }
+            }
         })
+        .catch(err => alert('連線錯誤'))
         .finally(() => hideLoading());
     }
 
-    // 傳送資料 (Add / Edit / Delete)
-    function sendCloudCommand(payload, successMsg) {
+    function sendCloudCommand(payload, successMsg, callback) {
         showLoading('資料同步中...');
         fetch(scriptURL, {
             method: 'POST',
@@ -230,26 +292,40 @@
         .then(res => res.json())
         .then(res => {
             if(res.result === 'success') {
-                fetchCloudData(); // 成功後重新抓取
                 if(successMsg) alert(successMsg);
-                if(payload.op === 'add' || payload.op === 'edit') cancelEdit();
+                fetchCloudData();
+                if(callback) callback();
             } else {
                 alert('操作失敗: ' + res.message);
             }
         })
-        .catch(err => alert('連線錯誤'))
         .finally(() => hideLoading());
     }
 
-    // 3. 表單提交 (新增/修改)
+    function logToCloud(action, detail) {
+        if(!currentUser) return;
+        fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify({
+                op: 'add',
+                tableName: 'logs',
+                user: currentUser.username,
+                action: action,
+                detail: detail
+            }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+    }
+
+    // 3. 帳務功能
     document.getElementById('accountForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const cat = document.getElementById('category').value;
         let finalDesc = cat === '餐費支出' && document.getElementById('descSelect').value === 'other' ? document.getElementById('descOtherInput').value.trim() : (cat === '餐費支出' ? document.getElementById('descSelect').value : document.getElementById('descInput').value.trim());
-        
         const editId = document.getElementById('editId').value;
         const payload = {
             op: editId ? 'edit' : 'add',
+            tableName: 'transactions',
             id: editId ? editId : Date.now(),
             date: document.getElementById('date').value,
             type: document.getElementById('type').value,
@@ -258,109 +334,107 @@
             desc: finalDesc,
             createdBy: currentUser.username
         };
-
-        sendCloudCommand(payload, editId ? '修改成功' : '新增成功');
+        sendCloudCommand(payload, editId ? '修改成功' : '新增成功', cancelEdit);
+        logToCloud(editId ? '修改交易' : '新增交易', `${cat} $${payload.amount}`);
     });
 
-    // 4. 刪除與編輯準備
     function deleteTrans(id) {
-        if(confirm('確定要從雲端刪除此筆資料嗎？(無法復原)')) {
-            sendCloudCommand({ op: 'delete', id: id }, '刪除成功');
+        if(confirm('確定刪除此筆資料？')) {
+            sendCloudCommand({ op: 'delete', tableName: 'transactions', id: id }, '刪除成功');
+            logToCloud('刪除交易', `ID: ${id}`);
         }
     }
 
-    function editTrans(id) {
-        const t = transactions.find(x => String(x.id) === String(id));
-        if(!t) return;
-        document.getElementById('editId').value = t.id;
-        document.getElementById('date').value = t.date;
-        document.getElementById('type').value = t.type;
-        document.getElementById('amount').value = t.amount;
-        updateCategoriesFromSettings();
-        document.getElementById('category').value = t.category;
-        checkMealCategory();
-        
-        if (t.category === '餐費支出') {
-            const sel = document.getElementById('descSelect');
-            if (settings.mealOptions.includes(t.desc)) sel.value = t.desc;
-            else { sel.value = 'other'; document.getElementById('descOtherInput').value = t.desc; checkMealOption(); }
-        } else {
-            document.getElementById('descInput').value = t.desc;
+    // 4. 使用者管理
+    document.getElementById('newUserForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const newU = document.getElementById('newUsername').value.trim();
+        if(cloudUsers.some(x => x.username === newU)) { alert('帳號已存在'); return; }
+        const payload = {
+            op: 'add',
+            tableName: 'users',
+            username: newU,
+            name: document.getElementById('newRealname').value.trim(),
+            password: document.getElementById('newPassword').value,
+            role: document.getElementById('newRole').value
+        };
+        sendCloudCommand(payload, '使用者新增成功', () => document.getElementById('newUserForm').reset());
+        logToCloud('新增人員', `帳號: ${newU}`);
+    });
+
+    function deleteUser(username) {
+        if(username === 'admin') { alert('無法刪除預設管理員'); return; }
+        if(confirm(`確定刪除使用者 ${username} 嗎？`)) {
+            sendCloudCommand({ op: 'delete', tableName: 'users', id: username }, '刪除成功');
+            logToCloud('刪除人員', `帳號: ${username}`);
         }
-
-        document.getElementById('formTitle').innerText = '修改模式';
-        document.getElementById('formTitle').className = 'card-header bg-warning text-dark';
-        document.getElementById('submitBtn').innerHTML = '💾 儲存修改';
-        document.getElementById('submitBtn').className = 'btn btn-warning w-100';
-        document.getElementById('cancelEditBtn').classList.remove('d-none');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function cancelEdit() {
-        document.getElementById('accountForm').reset();
-        document.getElementById('editId').value = '';
-        document.getElementById('date').value = getTodayString();
-        document.getElementById('formTitle').innerText = '新增交易';
-        document.getElementById('formTitle').className = 'card-header bg-primary text-white';
-        document.getElementById('submitBtn').innerHTML = '<i class="fas fa-plus-circle"></i> 上傳至雲端';
-        document.getElementById('submitBtn').className = 'btn btn-primary w-100';
-        document.getElementById('cancelEditBtn').classList.add('d-none');
-        checkMealCategory();
+    function renderUserList() {
+        const tbody = document.getElementById('userListBody');
+        tbody.innerHTML = '';
+        cloudUsers.forEach(u => {
+            const delBtn = u.username === 'admin' || u.username === currentUser.username ? '-' : `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`;
+            tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${delBtn}</td></tr>`;
+        });
     }
 
-    // 5. 畫面渲染與工具
+    function renderLogs() {
+        const tbody = document.getElementById('logListBody');
+        tbody.innerHTML = '';
+        cloudLogs.slice().reverse().slice(0, 100).forEach(log => {
+            tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`;
+        });
+    }
+
+    // 5. 畫面渲染
     function renderTable() {
         const tbody = document.getElementById('transactionList');
         tbody.innerHTML = '';
         let balance = 0;
-        // 排序
         transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
-        
         transactions.forEach(t => {
             if(t.type === 'income') balance += parseInt(t.amount); else balance -= parseInt(t.amount);
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${t.date}</td>
-                <td><span class="badge bg-light text-dark border">${t.category}</span></td>
-                <td>${t.desc}</td>
-                <td class="text-end text-success">${t.type==='income'? parseInt(t.amount).toLocaleString():''}</td>
-                <td class="text-end text-danger">${t.type==='expense'? parseInt(t.amount).toLocaleString():''}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="editTrans('${t.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTrans('${t.id}')"><i class="fas fa-trash"></i></button>
-                </td>
-            `;
+            tr.innerHTML = `<td>${t.date}</td><td><span class="badge bg-light text-dark border">${t.category}</span></td><td>${t.desc}</td><td class="text-end text-success">${t.type==='income'? parseInt(t.amount).toLocaleString():''}</td><td class="text-end text-danger">${t.type==='expense'? parseInt(t.amount).toLocaleString():''}</td>
+                <td><button class="btn btn-sm btn-outline-primary" onclick="editTrans('${t.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteTrans('${t.id}')"><i class="fas fa-trash"></i></button></td>`;
             tbody.appendChild(tr);
         });
         document.getElementById('currentBalance').innerText = '總餘額: ' + balance.toLocaleString();
     }
-
-    // 設定與其他輔助函式
+    
+    function editTrans(id){ const t=transactions.find(x=>String(x.id)===String(id)); if(!t)return; document.getElementById('editId').value=t.id; document.getElementById('date').value=t.date; document.getElementById('type').value=t.type; document.getElementById('amount').value=t.amount; updateCategoriesFromSettings(); document.getElementById('category').value=t.category; checkMealCategory(); if(t.category==='餐費支出'){const sel=document.getElementById('descSelect'); if(settings.mealOptions.includes(t.desc))sel.value=t.desc; else{sel.value='other';document.getElementById('descOtherInput').value=t.desc;checkMealOption();}}else{document.getElementById('descInput').value=t.desc;} document.getElementById('formTitle').innerText='修改模式'; document.getElementById('formTitle').className='card-header bg-warning text-dark'; document.getElementById('submitBtn').innerHTML='💾 儲存修改'; document.getElementById('submitBtn').className='btn btn-warning w-100'; document.getElementById('cancelEditBtn').classList.remove('d-none'); window.scrollTo({top:0,behavior:'smooth'}); }
+    function cancelEdit(){ document.getElementById('accountForm').reset(); document.getElementById('editId').value=''; document.getElementById('date').value=getTodayString(); document.getElementById('formTitle').innerText='新增交易'; document.getElementById('formTitle').className='card-header bg-primary text-white'; document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus-circle"></i> 上傳至雲端'; document.getElementById('submitBtn').className='btn btn-primary w-100'; document.getElementById('cancelEditBtn').classList.add('d-none'); checkMealCategory(); }
     function updateCategoriesFromSettings() { const type = document.getElementById('type').value; const catSelect = document.getElementById('category'); catSelect.innerHTML = ''; settings[type].forEach(cat => catSelect.add(new Option(cat, cat))); }
-    function renderSettings() { 
-        const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; 
-        r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); 
-    }
+    function renderSettings() { const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); }
     function addCategory(t){ const v=document.getElementById(t==='expense'?'newExpenseCat':'newIncomeCat').value.trim(); if(v){settings[t].push(v);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
     function removeCat(t,i){if(confirm('確定刪除？')){settings[t].splice(i,1);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
     function checkMealCategory() { const isMeal = document.getElementById('category').value === '餐費支出'; document.getElementById('descInput').classList.toggle('d-none', isMeal); document.getElementById('descSelect').classList.toggle('d-none', !isMeal); document.getElementById('descOtherInput').classList.add('d-none'); if (isMeal) { const sel = document.getElementById('descSelect'); sel.innerHTML = ''; settings.mealOptions.forEach(o => sel.add(new Option(o, o))); sel.add(new Option('其他', 'other')); checkMealOption(); } }
     function checkMealOption() { document.getElementById('descOtherInput').classList.toggle('d-none', document.getElementById('descSelect').value !== 'other'); }
-    
-    // 報表 PDF/Excel 功能
     function updateDateRange() { const m=document.getElementById('reportPeriodMode').value, s=document.getElementById('reportStartDate'), e=document.getElementById('reportEndDate'), n=new Date(); if(m==='thisMonth'){s.value=new Date(n.getFullYear(),n.getMonth(),1).toISOString().slice(0,10);e.value=new Date(n.getFullYear(),n.getMonth()+1,0).toISOString().slice(0,10);} else if(m==='lastMonth'){s.value=new Date(n.getFullYear(),n.getMonth()-1,1).toISOString().slice(0,10);e.value=new Date(n.getFullYear(),n.getMonth(),0).toISOString().slice(0,10);} updatePreviewStats(); }
     function getReportData(s,e){ let arr=[...transactions].sort((a,b)=>new Date(a.date)-new Date(b.date)); let open=0, incS={}, expS={}, tI=0, tE=0; settings.income.forEach(c=>incS[c]=0); settings.expense.forEach(c=>expS[c]=0); arr.forEach(t=>{ if(t.date<s){ if(t.type==='income')open+=parseInt(t.amount); else open-=parseInt(t.amount); } else if(t.date>=s && t.date<=e){ if(t.type==='income'){ if(!incS[t.category])incS[t.category]=0; incS[t.category]+=parseInt(t.amount); tI+=parseInt(t.amount); } else{ if(!expS[t.category])expS[t.category]=0; expS[t.category]+=parseInt(t.amount); tE+=parseInt(t.amount); } } }); return {openingBalance:open, periodData:arr.filter(t=>t.date>=s&&t.date<=e), incStats:incS, expStats:expS, totalInc:tI, totalExp:tE}; }
     function updatePreviewStats() { const s=document.getElementById('reportStartDate').value, e=document.getElementById('reportEndDate').value; if(!s||!e)return; const d = getReportData(s,e); const ib=document.getElementById('preview-income-body'), eb=document.getElementById('preview-expense-body'); ib.innerHTML=`<tr><td>上期餘額</td><td class="text-end">${d.openingBalance.toLocaleString()}</td></tr>`; eb.innerHTML=''; for(const[c,v]of Object.entries(d.incStats))if(v>0)ib.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; for(const[c,v]of Object.entries(d.expStats))if(v>0)eb.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; const g=d.totalInc+d.openingBalance; document.getElementById('preview-final-balance').textContent=(g-d.totalExp).toLocaleString(); }
+    
+    // PDF 生成
     function generatePDF(){
         const s = document.getElementById('reportStartDate').value; const e = document.getElementById('reportEndDate').value; 
         if(!s||!e){alert('請選擇日期');return;} const d = getReportData(s,e);
-        const printContainer = document.createElement('div'); printContainer.style.cssText = "position:absolute; top:0; left:0; width:100%; min-height:100vh; background:white; z-index:999999; padding:20px; color:black;";
-        let html = `<h2 style='text-align:center;'>高登科【靜修校】收支表</h2><p style='text-align:center;'>${s} ~ ${e}</p><table style='width:100%; border-collapse:collapse; border:1px solid black;'><thead><tr style='background:#eee;'><th style='border:1px solid black;'>日期</th><th style='border:1px solid black;'>分類</th><th style='border:1px solid black;'>收</th><th style='border:1px solid black;'>支</th><th style='border:1px solid black;'>餘</th><th style='border:1px solid black;'>備註</th></tr></thead><tbody>`;
-        let bal = d.openingBalance; html += `<tr><td>${s}</td><td colspan='3' style='text-align:center;'>【上期餘額】</td><td>${bal}</td><td></td></tr>`;
-        d.periodData.forEach(t => { if(t.type === 'income') bal += parseInt(t.amount); else bal -= parseInt(t.amount); html += `<tr><td style='border:1px solid black;'>${t.date}</td><td style='border:1px solid black;'>${t.category}</td><td style='border:1px solid black;'>${t.type==='income'?t.amount:''}</td><td style='border:1px solid black;'>${t.type==='expense'?t.amount:''}</td><td style='border:1px solid black;'>${bal}</td><td style='border:1px solid black;'>${t.desc}</td></tr>`; });
-        html += `</tbody></table>`;
+        const printContainer = document.createElement('div');
+        printContainer.style.cssText = "position:absolute; top:0; left:0; width:800px; background:white; z-index:999999; padding:20px; color:black !important; font-family: 'Microsoft JhengHei', sans-serif;";
+        
+        let html = `<h2 style='text-align:center; color:black;'>高登科【靜修校】收支表</h2><p style='text-align:center; color:black;'>統計期間: ${s} ~ ${e}</p>
+        <table style='width:100%; border-collapse:collapse; border:1px solid black; color:black; font-size:12px;'>
+            <thead><tr style='background:#f2f2f2;'><th style='border:1px solid black; padding:5px;'>日期</th><th style='border:1px solid black; padding:5px;'>分類</th><th style='border:1px solid black; padding:5px;'>收入</th><th style='border:1px solid black; padding:5px;'>支出</th><th style='border:1px solid black; padding:5px;'>餘額</th><th style='border:1px solid black; padding:5px;'>備註</th></tr></thead><tbody>`;
+        let bal = d.openingBalance; 
+        html += `<tr><td>${s}</td><td colspan='3' style='text-align:center;'>【上期餘額】</td><td>${bal.toLocaleString()}</td><td></td></tr>`;
+        d.periodData.forEach(t => { if(t.type === 'income') bal += parseInt(t.amount); else bal -= parseInt(t.amount); 
+            html += `<tr><td style='border:1px solid black; padding:4px;'>${t.date}</td><td style='border:1px solid black; padding:4px;'>${t.category}</td><td style='border:1px solid black; padding:4px; text-align:right;'>${t.type==='income'?parseInt(t.amount).toLocaleString():''}</td><td style='border:1px solid black; padding:4px; text-align:right;'>${t.type==='expense'?parseInt(t.amount).toLocaleString():''}</td><td style='border:1px solid black; padding:4px; text-align:right;'>${bal.toLocaleString()}</td><td style='border:1px solid black; padding:4px;'>${t.desc}</td></tr>`; });
+        const grandInc = d.totalInc + d.openingBalance;
+        html += `</tbody></table><div style='margin-top:20px;'><h3 style='text-align:center; color:black;'>收支總表</h3><table style='width:100%; border:1px solid black; border-collapse:collapse; color:black;'><tr><td style='border:1px solid black; padding:5px;'>收入總計</td><td style='border:1px solid black; padding:5px; text-align:right;'>${grandInc.toLocaleString()}</td><td style='border:1px solid black; padding:5px;'>支出總計</td><td style='border:1px solid black; padding:5px; text-align:right;'>${d.totalExp.toLocaleString()}</td></tr><tr style='background:#ffffcc;'><td colspan='2' style='border:1px solid black; padding:10px; font-weight:bold; text-align:center;'>本期結餘</td><td colspan='2' style='border:1px solid black; padding:10px; font-weight:bold; text-align:center; color:blue;'>${(grandInc - d.totalExp).toLocaleString()}</td></tr></table></div>`;
         printContainer.innerHTML = html; document.body.appendChild(printContainer);
-        html2pdf().from(printContainer).save(`${s}_報表.pdf`).then(() => document.body.removeChild(printContainer));
+        setTimeout(() => { html2pdf().set({margin:10,filename:`${s}_靜修收支表.pdf`,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(printContainer).save().then(() => { document.body.removeChild(printContainer); }); }, 800);
     }
+    
     function exportExcel() {
         const s = document.getElementById('reportStartDate').value || '2000-01-01', e = document.getElementById('reportEndDate').value || '2099-12-31';
         const d = getReportData(s,e);
