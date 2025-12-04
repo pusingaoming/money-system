@@ -17,7 +17,6 @@
         #amount { background-color: #ffdddd; border-color: #ffcccc; font-weight: bold; }
         .d-none { display: none !important; }
         
-        /* 遮罩樣式 */
         #loading-overlay, #login-overlay, #logout-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
             display: flex; justify-content: center; align-items: center;
@@ -38,13 +37,13 @@
 <div id="logout-overlay">
     <div class="card p-4 text-center" style="width: 400px; border: 2px solid #dc3545;">
         <h3 class="text-danger mb-3"><i class="fas fa-exclamation-triangle"></i> 登出提醒</h3>
-        <p class="mb-4 text-muted">為確保資料安全，登出前建議您備份資料。</p>
+        <p class="mb-4 text-muted">系統將自動彙整今日新增資料並發送通知信。</p>
         <div class="d-grid gap-3">
             <button class="btn btn-success btn-lg" onclick="exportLastMonthData()">
-                <i class="fas fa-file-excel"></i> 匯出近一個月 EXCEL 檔案
+                <i class="fas fa-file-excel"></i> 1. 匯出近一個月 EXCEL
             </button>
-            <button class="btn btn-outline-secondary btn-lg" onclick="location.reload()">
-                <i class="fas fa-sign-out-alt"></i> 已匯出，結束程式
+            <button class="btn btn-outline-secondary btn-lg" onclick="finalLogout()">
+                <i class="fas fa-sign-out-alt"></i> 2. 已匯出，結束程式
             </button>
             <button class="btn btn-link text-muted" onclick="document.getElementById('logout-overlay').style.display='none'">取消</button>
         </div>
@@ -52,20 +51,14 @@
 </div>
 
 <div id="login-overlay">
-    <div class="card p-4" style="width: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+    <div class="card p-4" style="width: 350px;">
         <div class="text-center mb-3">
             <h3 class="main-title">系統登入</h3>
             <small class="text-muted">高登科<span class="highlight-red">【靜修校】</span>雲端帳務</small>
         </div>
         <form id="loginForm">
-            <div class="mb-3">
-                <label class="form-label">帳號</label>
-                <input type="text" class="form-control" id="loginUser" required placeholder="請輸入帳號">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">密碼</label>
-                <input type="password" class="form-control" id="loginPass" required placeholder="請輸入密碼">
-            </div>
+            <div class="mb-3"><label class="form-label">帳號</label><input type="text" class="form-control" id="loginUser" required placeholder="請輸入帳號"></div>
+            <div class="mb-3"><label class="form-label">密碼</label><input type="password" class="form-control" id="loginPass" required placeholder="請輸入密碼"></div>
             <button type="submit" class="btn btn-primary w-100">登入並連線資料庫</button>
             <div id="loginError" class="text-danger text-center mt-2 small"></div>
         </form>
@@ -108,7 +101,7 @@
                                     <select class="form-select d-none" id="descSelect" onchange="checkMealOption()"></select>
                                     <input type="text" class="form-control mt-2 d-none" id="descOtherInput" placeholder="請輸入新店家名稱 (將自動儲存)">
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100" id="submitBtn"><i class="fas fa-plus-circle"></i> 上傳至雲端 (並發信通知)</button>
+                                <button type="submit" class="btn btn-primary w-100" id="submitBtn"><i class="fas fa-check"></i> 記錄並送出</button>
                                 <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="cancelEditBtn" onclick="cancelEdit()">取消修改</button>
                             </form>
                         </div>
@@ -117,13 +110,13 @@
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-list"></i> 雲端資料列表 <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄 重新整理</button></span>
+                            <span><i class="fas fa-list"></i> 雲端資料列表 <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄</button></span>
                             <span id="currentBalance" class="badge bg-warning text-dark">0</span>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                                 <table class="table table-hover table-sm sticky-top">
-                                    <thead class="table-light"><tr><th>日期</th><th>分類</th><th>內容</th><th class="text-end">收入</th><th class="text-end">支出</th><th>操作</th></tr></thead>
+                                    <thead class="table-light"><tr><th>日期</th><th>分類</th><th>內容</th><th class="text-end">金額</th><th>操作</th></tr></thead>
                                     <tbody id="transactionList"></tbody>
                                 </table>
                             </div>
@@ -138,10 +131,10 @@
                 <div class="card-header bg-info text-dark fw-bold">期間報表統計</div>
                 <div class="card-body bg-white">
                     <div class="row g-3 align-items-end mb-4 border-bottom pb-3">
-                        <div class="col-md-3"><label class="form-label">期間模式</label><select class="form-select" id="reportPeriodMode" onchange="updateDateRange()"><option value="thisMonth" selected>本月</option><option value="lastMonth">上月</option><option value="custom">自訂</option></select></div>
+                        <div class="col-md-3"><label class="form-label">期間</label><select class="form-select" id="reportPeriodMode" onchange="updateDateRange()"><option value="thisMonth" selected>本月</option><option value="lastMonth">上月</option><option value="custom">自訂</option></select></div>
                         <div class="col-md-3"><input type="date" class="form-control" id="reportStartDate" onchange="updatePreviewStats()"></div>
                         <div class="col-md-3"><input type="date" class="form-control" id="reportEndDate" onchange="updatePreviewStats()"></div>
-                        <div class="col-md-3"><button class="btn btn-success w-100" onclick="exportComplexExcel()"><i class="fas fa-file-excel"></i> 匯出 Excel 完整報表</button></div>
+                        <div class="col-md-3"><button class="btn btn-success w-100" onclick="exportComplexExcel()"><i class="fas fa-file-excel"></i> 匯出 Excel</button></div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6"><div class="card h-100 border-success"><div class="card-header bg-success text-white">收入</div><div class="card-body p-0"><table class="table table-striped mb-0"><tbody id="preview-income-body"></tbody></table></div></div></div>
@@ -154,9 +147,9 @@
 
         <div class="tab-pane fade" id="manage">
             <div class="card mb-4 border-warning">
-                <div class="card-header bg-warning text-dark"><i class="fas fa-utensils"></i> 餐費支出選項設定</div>
+                <div class="card-header bg-warning text-dark"><i class="fas fa-utensils"></i> 餐費支出選項設定 (雲端同步)</div>
                 <div class="card-body">
-                    <p class="text-muted small">此處可管理「餐費」的下拉選單。修改選單名稱不會影響已輸入的歷史帳務。</p>
+                    <p class="text-muted small">此處新增或修改的選項會同步至雲端系統。</p>
                     <div class="input-group mb-2">
                         <input type="text" class="form-control" id="newMealOpt" placeholder="輸入新店家名稱">
                         <button class="btn btn-outline-dark" onclick="addMealOption()">新增選項</button>
@@ -164,7 +157,6 @@
                     <div id="mealOptionList" class="d-flex flex-wrap gap-2 p-2 border rounded bg-white"></div>
                 </div>
             </div>
-
             <div class="card mb-4">
                 <div class="card-header bg-secondary text-white">收支項目分類</div>
                 <div class="card-body">
@@ -186,15 +178,9 @@
                                 <div class="card-body">
                                     <h6 class="card-title">新增使用者</h6>
                                     <form id="newUserForm">
-                                        <div class="mb-2">
-                                            <label class="small text-muted">帳號 (支援數字/文字)</label>
-                                            <input type="text" class="form-control" id="newUsername" placeholder="輸入帳號" required>
-                                        </div>
+                                        <div class="mb-2"><input type="text" class="form-control" id="newUsername" placeholder="帳號" required></div>
                                         <div class="mb-2"><input type="text" class="form-control" id="newRealname" placeholder="顯示名稱" required></div>
-                                        <div class="mb-2">
-                                            <label class="small text-muted">密碼 (支援符號)</label>
-                                            <input type="password" class="form-control" id="newPassword" placeholder="輸入密碼" required>
-                                        </div>
+                                        <div class="mb-2"><input type="password" class="form-control" id="newPassword" placeholder="密碼" required></div>
                                         <div class="mb-2"><select class="form-select" id="newRole"><option value="user">一般使用者</option><option value="admin">管理者</option></select></div>
                                         <button type="submit" class="btn btn-primary w-100">建立雲端帳號</button>
                                     </form>
@@ -209,11 +195,9 @@
 
         <div class="tab-pane fade" id="logs">
             <div class="card border-secondary">
-                <div class="card-header bg-secondary text-white"><i class="fas fa-history"></i> 雲端操作紀錄 (唯讀)</div>
+                <div class="card-header bg-secondary text-white"><i class="fas fa-history"></i> 雲端操作紀錄</div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-sm" style="font-size: 0.85rem;"><thead><tr><th style="width:160px;">時間</th><th>操作人員</th><th>動作</th><th>詳情</th></tr></thead><tbody id="logListBody"></tbody></table>
-                    </div>
+                    <div class="table-responsive"><table class="table table-striped table-sm" style="font-size: 0.85rem;"><thead><tr><th style="width:160px;">時間</th><th>操作人員</th><th>動作</th><th>詳情</th></tr></thead><tbody id="logListBody"></tbody></table></div>
                 </div>
             </div>
         </div>
@@ -223,15 +207,18 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // ▼▼▼ 您的 Web App 網址 ▼▼▼
+    // ▼▼▼ 您的網址 ▼▼▼
     const scriptURL = 'https://script.google.com/macros/s/AKfycbzGnWo-GWlavpYjMb5I6IwCIAsMlSeu2eHou2chlJPJELckyTU7bsln1Ho7F68n2VA-Gw/exec';
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
     let transactions = [];
     let cloudUsers = [];
     let cloudLogs = [];
     let currentUser = null;
-    let settings = JSON.parse(localStorage.getItem('accSettings')) || {
+    let sessionActions = []; // 🔥 存放本次登入的操作，登出時才寄信
+    
+    // 預設設定 (若雲端沒資料時使用)
+    let settings = {
         expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"],
         income: ["入帳(零用金)", "學生轉入餐費", "其他收入"],
         mealOptions: ["天食鍋燒", "B鴨董", "來碗粥", "飯卷", "水餃峰", "太祖魷魚羮", "八方鍋胋", "阿胖食堂", "點心"]
@@ -239,7 +226,7 @@
 
     function getTodayString() { const n=new Date(); return new Date(n.getTime()-(n.getTimezoneOffset()*60000)).toISOString().slice(0,10); }
 
-    // 1. 登入邏輯
+    // 1. 登入
     document.getElementById('loginForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const u = document.getElementById('loginUser').value.trim();
@@ -250,16 +237,17 @@
         .then(res => {
             if(res.result === 'success') {
                 const users = res.data.users;
-                // 注意：這裡比對密碼時，不論文字/數字/符號都會當作字串處理
+                // 若雲端有設定，則覆蓋本地設定 (同步機制)
+                if(res.data.settings) settings = res.data.settings;
+                
                 let foundUser = users.find(x => String(x.username) === u && String(x.password) === p);
                 if(!foundUser && u === 'admin' && p === '54381017') foundUser = { username: 'admin', role: 'admin', name: '系統預設管理員' };
 
                 if(foundUser) {
                     currentUser = foundUser;
+                    sessionActions = []; // 清空操作紀錄
                     loginSuccess();
-                } else {
-                    document.getElementById('loginError').innerText = '帳號或密碼錯誤';
-                }
+                } else { document.getElementById('loginError').innerText = '帳號或密碼錯誤'; }
             } else { alert('連線失敗'); }
         })
         .catch(err => { console.error(err); alert('網路錯誤'); })
@@ -281,7 +269,28 @@
         logToCloud('登入', '使用者登入系統');
     }
 
-    // 2. 雲端通訊
+    // 2. 登出與寄信
+    function finalLogout() {
+        showLoading('正在匯總資料並發送通知...');
+        
+        // 傳送 sessionActions 給後端發信
+        fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify({
+                op: 'send_summary',
+                user: currentUser.name,
+                time: new Date().toLocaleString(),
+                summary: sessionActions
+            }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        })
+        .then(res => res.json())
+        .finally(() => {
+            location.reload(); // 無論寄信成功與否，最後都重整登出
+        });
+    }
+
+    // 3. 雲端通訊
     function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading-overlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
     function fetchCloudData() {
@@ -291,13 +300,20 @@
                 transactions = res.data.transactions;
                 cloudUsers = res.data.users;
                 cloudLogs = res.data.logs;
+                // 同步設定
+                if(res.data.settings) {
+                    settings = res.data.settings;
+                    renderSettings();
+                    updateCategoriesFromSettings();
+                }
                 renderTable(); updatePreviewStats();
                 if(currentUser && currentUser.role === 'admin') { renderUserList(); renderLogs(); }
             }
         }).catch(err => alert('連線錯誤')).finally(() => hideLoading());
     }
+    
     function sendCloudCommand(payload, successMsg, callback) {
-        showLoading('資料同步中(並發送通知)...');
+        showLoading('資料同步中...');
         fetch(scriptURL, { method: 'POST', body: JSON.stringify(payload), headers: { "Content-Type": "text/plain;charset=utf-8" } })
         .then(res => res.json()).then(res => {
             if(res.result === 'success') {
@@ -305,16 +321,28 @@
             } else { alert('操作失敗: ' + res.message); }
         }).finally(() => hideLoading());
     }
+    
+    // 儲存設定到雲端
+    function saveSettingsToCloud() {
+        // 不顯示 Loading，背景儲存
+        fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify({ op: 'save_settings', settings: settings }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+    }
+
     function logToCloud(action, detail) {
         if(!currentUser) return;
         fetch(scriptURL, { method: 'POST', body: JSON.stringify({ op: 'add', tableName: 'logs', user: currentUser.username, action: action, detail: detail }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
     }
 
-    // 3. 帳務與自動學習功能
+    // 4. 帳務與自動學習
     document.getElementById('accountForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const cat = document.getElementById('category').value;
         let finalDesc;
+        let isNewMeal = false;
         
         if (cat === '餐費支出') {
             const selectVal = document.getElementById('descSelect').value;
@@ -322,8 +350,7 @@
                 finalDesc = document.getElementById('descOtherInput').value.trim();
                 if (finalDesc && !settings.mealOptions.includes(finalDesc)) {
                     settings.mealOptions.push(finalDesc);
-                    localStorage.setItem('accSettings', JSON.stringify(settings));
-                    renderSettings();
+                    isNewMeal = true;
                 }
             } else { finalDesc = selectVal; }
         } else { finalDesc = document.getElementById('descInput').value.trim(); }
@@ -334,26 +361,60 @@
             date: document.getElementById('date').value, type: document.getElementById('type').value, category: cat,
             amount: document.getElementById('amount').value, desc: finalDesc, createdBy: currentUser.username
         };
-        sendCloudCommand(payload, editId ? '修改成功' : '新增成功 (已寄信通知管理者)', cancelEdit);
-        if(!editId) logToCloud('新增交易', `${cat} $${payload.amount}`); // 修改不寄信
+        
+        sendCloudCommand(payload, editId ? '修改成功' : '記錄並送出成功', () => {
+            cancelEdit();
+            if(isNewMeal) { saveSettingsToCloud(); renderSettings(); } // 新增店家後同步雲端
+        });
+
+        // 加入暫存，準備登出時寄信
+        if(!editId) {
+            sessionActions.push({ action: '新增', category: cat, amount: payload.amount, desc: finalDesc });
+            logToCloud('新增交易', `${cat} $${payload.amount}`);
+        } else {
+            sessionActions.push({ action: '修改', category: cat, amount: payload.amount, desc: finalDesc });
+            logToCloud('修改交易', `ID: ${editId}`);
+        }
     });
 
-    function deleteTrans(id) { if(confirm('確定刪除？')) { sendCloudCommand({ op: 'delete', tableName: 'transactions', id: id }, '刪除成功'); logToCloud('刪除交易', `ID: ${id}`); } }
+    function deleteTrans(id) { 
+        if(confirm('確定刪除？')) { 
+            sendCloudCommand({ op: 'delete', tableName: 'transactions', id: id }, '刪除成功'); 
+            sessionActions.push({ action: '刪除', category: '-', amount: '-', desc: `ID:${id}` });
+            logToCloud('刪除交易', `ID: ${id}`); 
+        } 
+    }
 
-    // 4. 使用者管理
+    // 5. 設定管理 (CRUD 並同步雲端)
+    function addCategory(t){ const v=document.getElementById(t==='expense'?'newExpenseCat':'newIncomeCat').value.trim(); if(v){settings[t].push(v); saveSettingsToCloud(); renderSettings(); updateCategoriesFromSettings();}}
+    function removeCat(t,i){if(confirm('確定刪除？')){settings[t].splice(i,1); saveSettingsToCloud(); renderSettings(); updateCategoriesFromSettings();}}
+    
+    function addMealOption() { const v = document.getElementById('newMealOpt').value.trim(); if(v && !settings.mealOptions.includes(v)) { settings.mealOptions.push(v); saveSettingsToCloud(); renderSettings(); document.getElementById('newMealOpt').value = ''; } }
+    function removeMealOpt(i) { if(confirm('確定刪除？')) { settings.mealOptions.splice(i, 1); saveSettingsToCloud(); renderSettings(); } }
+    function editMealOpt(i) { 
+        const old = settings.mealOptions[i]; const n = prompt("修改名稱:", old); 
+        if(n && n.trim()!==old){ 
+            settings.mealOptions[i]=n.trim(); 
+            saveSettingsToCloud(); // 修改後立即同步
+            renderSettings(); 
+        } 
+    }
+
+    function renderSettings() { 
+        const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; 
+        r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); 
+        const m = document.getElementById('mealOptionList'); m.innerHTML=''; 
+        settings.mealOptions.forEach((o,i) => {
+            m.innerHTML += `<div class="badge bg-warning text-dark p-2 border me-1 mb-1">${o} <i class="fas fa-edit ms-1" style="cursor:pointer" onclick="editMealOpt(${i})"></i><i class="fas fa-times ms-1" style="cursor:pointer" onclick="removeMealOpt(${i})"></i></div>`;
+        });
+    }
+
+    // 6. 使用者管理
     document.getElementById('newUserForm').addEventListener('submit', (e) => {
         e.preventDefault();
-        const newU = document.getElementById('newUsername').value.trim(); // 接受文字與數字
+        const newU = document.getElementById('newUsername').value.trim();
         if(cloudUsers.some(x => String(x.username) === newU)) { alert('帳號已存在'); return; }
-        
-        const payload = { 
-            op: 'add', 
-            tableName: 'users', 
-            username: newU, 
-            name: document.getElementById('newRealname').value.trim(), 
-            password: document.getElementById('newPassword').value, // 接受符號
-            role: document.getElementById('newRole').value 
-        };
+        const payload = { op: 'add', tableName: 'users', username: newU, name: document.getElementById('newRealname').value.trim(), password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value };
         sendCloudCommand(payload, '使用者新增成功', () => document.getElementById('newUserForm').reset());
         logToCloud('新增人員', `帳號: ${newU}`);
     });
@@ -373,21 +434,20 @@
         cloudLogs.slice().reverse().slice(0, 100).forEach(log => { tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`; });
     }
 
-    // 5. 畫面渲染
+    // 7. 渲染 & 報表
     function renderTable() {
         const tbody = document.getElementById('transactionList'); tbody.innerHTML = ''; let balance = 0;
         transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
         transactions.forEach(t => {
             if(t.type === 'income') balance += parseInt(t.amount); else balance -= parseInt(t.amount);
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${t.date}</td><td><span class="badge bg-light text-dark border">${t.category}</span></td><td>${t.desc}</td><td class="text-end text-success">${t.type==='income'? parseInt(t.amount).toLocaleString():''}</td><td class="text-end text-danger">${t.type==='expense'? parseInt(t.amount).toLocaleString():''}</td>
+            tr.innerHTML = `<td>${t.date}</td><td><span class="badge bg-light text-dark border">${t.category}</span></td><td>${t.desc}</td><td class="text-end text-${t.type==='income'?'success':'danger'}">${parseInt(t.amount).toLocaleString()}</td>
                 <td><button class="btn btn-sm btn-outline-primary" onclick="editTrans('${t.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteTrans('${t.id}')"><i class="fas fa-trash"></i></button></td>`;
             tbody.appendChild(tr);
         });
         document.getElementById('currentBalance').innerText = '總餘額: ' + balance.toLocaleString();
     }
     
-    // 編輯與設定邏輯
     function editTrans(id){ const t=transactions.find(x=>String(x.id)===String(id)); if(!t)return; document.getElementById('editId').value=t.id; document.getElementById('date').value=t.date; document.getElementById('type').value=t.type; document.getElementById('amount').value=t.amount; updateCategoriesFromSettings(); document.getElementById('category').value=t.category; checkMealCategory(); 
         if(t.category==='餐費支出'){
             const sel=document.getElementById('descSelect'); 
@@ -396,23 +456,8 @@
         }else{document.getElementById('descInput').value=t.desc;} 
         document.getElementById('formTitle').innerText='修改模式'; document.getElementById('formTitle').className='card-header bg-warning text-dark'; document.getElementById('submitBtn').innerHTML='💾 儲存修改'; document.getElementById('submitBtn').className='btn btn-warning w-100'; document.getElementById('cancelEditBtn').classList.remove('d-none'); window.scrollTo({top:0,behavior:'smooth'}); 
     }
-    function cancelEdit(){ document.getElementById('accountForm').reset(); document.getElementById('editId').value=''; document.getElementById('date').value=getTodayString(); document.getElementById('formTitle').innerText='新增交易'; document.getElementById('formTitle').className='card-header bg-primary text-white'; document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus-circle"></i> 上傳至雲端 (並發信通知)'; document.getElementById('submitBtn').className='btn btn-primary w-100'; document.getElementById('cancelEditBtn').classList.add('d-none'); checkMealCategory(); }
+    function cancelEdit(){ document.getElementById('accountForm').reset(); document.getElementById('editId').value=''; document.getElementById('date').value=getTodayString(); document.getElementById('formTitle').innerText='新增交易'; document.getElementById('formTitle').className='card-header bg-primary text-white'; document.getElementById('submitBtn').innerHTML='<i class="fas fa-check"></i> 記錄並送出'; document.getElementById('submitBtn').className='btn btn-primary w-100'; document.getElementById('cancelEditBtn').classList.add('d-none'); checkMealCategory(); }
     function updateCategoriesFromSettings() { const type = document.getElementById('type').value; const catSelect = document.getElementById('category'); catSelect.innerHTML = ''; settings[type].forEach(cat => catSelect.add(new Option(cat, cat))); }
-    
-    function renderSettings() { 
-        const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; 
-        r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); 
-        const m = document.getElementById('mealOptionList'); m.innerHTML=''; 
-        settings.mealOptions.forEach((o,i) => {
-            m.innerHTML += `<div class="badge bg-warning text-dark p-2 border me-1 mb-1">${o} <i class="fas fa-edit ms-1" style="cursor:pointer" onclick="editMealOpt(${i})"></i><i class="fas fa-times ms-1" style="cursor:pointer" onclick="removeMealOpt(${i})"></i></div>`;
-        });
-    }
-    function addCategory(t){ const v=document.getElementById(t==='expense'?'newExpenseCat':'newIncomeCat').value.trim(); if(v){settings[t].push(v);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
-    function removeCat(t,i){if(confirm('確定刪除？')){settings[t].splice(i,1);localStorage.setItem('accSettings',JSON.stringify(settings));renderSettings();updateCategoriesFromSettings();}}
-    function addMealOption() { const v = document.getElementById('newMealOpt').value.trim(); if(v && !settings.mealOptions.includes(v)) { settings.mealOptions.push(v); localStorage.setItem('accSettings', JSON.stringify(settings)); renderSettings(); document.getElementById('newMealOpt').value = ''; } }
-    function removeMealOpt(i) { if(confirm('確定刪除？')) { settings.mealOptions.splice(i, 1); localStorage.setItem('accSettings', JSON.stringify(settings)); renderSettings(); } }
-    function editMealOpt(i) { const old = settings.mealOptions[i]; const n = prompt("修改名稱:", old); if(n && n.trim()!==old){ settings.mealOptions[i]=n.trim(); localStorage.setItem('accSettings', JSON.stringify(settings)); renderSettings(); } }
-
     function checkMealCategory() { const isMeal = document.getElementById('category').value === '餐費支出'; document.getElementById('descInput').classList.toggle('d-none', isMeal); document.getElementById('descSelect').classList.toggle('d-none', !isMeal); document.getElementById('descOtherInput').classList.add('d-none'); if (isMeal) { const sel = document.getElementById('descSelect'); sel.innerHTML = ''; settings.mealOptions.forEach(o => sel.add(new Option(o, o))); sel.add(new Option('其他 (手動輸入)', 'other')); checkMealOption(); } }
     function checkMealOption() { document.getElementById('descOtherInput').classList.toggle('d-none', document.getElementById('descSelect').value !== 'other'); }
     
@@ -420,28 +465,20 @@
     function getReportData(s,e){ let arr=[...transactions].sort((a,b)=>new Date(a.date)-new Date(b.date)); let open=0, incS={}, expS={}, tI=0, tE=0; settings.income.forEach(c=>incS[c]=0); settings.expense.forEach(c=>expS[c]=0); arr.forEach(t=>{ if(t.date<s){ if(t.type==='income')open+=parseInt(t.amount); else open-=parseInt(t.amount); } else if(t.date>=s && t.date<=e){ if(t.type==='income'){ if(!incS[t.category])incS[t.category]=0; incS[t.category]+=parseInt(t.amount); tI+=parseInt(t.amount); } else{ if(!expS[t.category])expS[t.category]=0; expS[t.category]+=parseInt(t.amount); tE+=parseInt(t.amount); } } }); return {openingBalance:open, periodData:arr.filter(t=>t.date>=s&&t.date<=e), incStats:incS, expStats:expS, totalInc:tI, totalExp:tE}; }
     function updatePreviewStats() { const s=document.getElementById('reportStartDate').value, e=document.getElementById('reportEndDate').value; if(!s||!e)return; const d = getReportData(s,e); const ib=document.getElementById('preview-income-body'), eb=document.getElementById('preview-expense-body'); ib.innerHTML=`<tr><td>上期餘額</td><td class="text-end">${d.openingBalance.toLocaleString()}</td></tr>`; eb.innerHTML=''; for(const[c,v]of Object.entries(d.incStats))if(v>0)ib.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; for(const[c,v]of Object.entries(d.expStats))if(v>0)eb.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; const g=d.totalInc+d.openingBalance; document.getElementById('preview-final-balance').textContent=(g-d.totalExp).toLocaleString(); }
     
-    // 🔥 匯出邏輯修改：支援「自動計算近一個月」
     function exportLastMonthData() {
         const today = new Date();
         const endStr = today.toISOString().slice(0,10);
-        
-        const lastMonth = new Date();
-        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1);
         const startStr = lastMonth.toISOString().slice(0,10);
-        
         exportComplexExcel(startStr, endStr);
     }
 
     function exportComplexExcel(startOverride, endOverride) {
-        // 如果有傳入參數就用參數，沒有就抓介面上的日期
         const s = startOverride || document.getElementById('reportStartDate').value;
         const e = endOverride || document.getElementById('reportEndDate').value;
-        
         if(!s || !e) { alert('請選擇日期'); return; }
-
         const d = getReportData(s, e);
         const wb = XLSX.utils.book_new();
-
         let detailData = [['日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']];
         d.periodData.forEach(t => { detailData.push([ t.date, t.type === 'income' ? '收入' : '支出', t.category, t.desc, t.type === 'income' ? parseInt(t.amount) : 0, t.type === 'expense' ? parseInt(t.amount) : 0, t.createdBy || '' ]); });
         const ws1 = XLSX.utils.aoa_to_sheet(detailData); ws1['!cols'] = [{wch:12}, {wch:10}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}];
