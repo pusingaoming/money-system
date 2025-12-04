@@ -15,9 +15,9 @@
         .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 10px; margin-bottom: 20px; }
         .card-header { background-color: #0d6efd; color: white; font-weight: bold; }
         
-        /* 🔴 金額欄位特殊樣式 */
+        /* 金額欄位特殊樣式 */
         #amount { 
-            background-color: #ffcccc; /* 紅色底 */
+            background-color: #ffcccc; 
             border: 2px solid #ff9999; 
             font-weight: bold; 
             font-size: 1.2rem;
@@ -37,8 +37,13 @@
         #logout-overlay { background: rgba(0,0,0,0.85); display: none; }
         .spinner-border { width: 3rem; height: 3rem; }
         
-        /* 序號欄位樣式 */
         .col-id { font-family: 'Courier New', monospace; font-weight: bold; color: #555; }
+        
+        /* 排序標題樣式 */
+        .sort-header { cursor: pointer; user-select: none; }
+        .sort-header:hover { background-color: #e9ecef; }
+        .sort-icon { font-size: 0.8em; margin-left: 5px; color: #aaa; }
+        .sort-active { color: #0d6efd; }
     </style>
 </head>
 <body>
@@ -108,12 +113,10 @@
                                 <div class="mb-3"><label class="form-label">日期</label><input type="date" class="form-control" id="date" required></div>
                                 <div class="mb-3"><label class="form-label">收支類型</label><select class="form-select" id="type" onchange="updateCategoriesFromSettings()" required><option value="expense" selected>支出</option><option value="income">收入</option></select></div>
                                 <div class="mb-3"><label class="form-label">項目分類</label><select class="form-select" id="category" required onchange="checkMealCategory()"></select></div>
-                                
                                 <div class="mb-3">
                                     <label class="form-label fw-bold text-danger">金額</label>
                                     <input type="number" class="form-control" id="amount" placeholder="請在此輸入金額" required>
                                 </div>
-                                
                                 <div class="mb-3">
                                     <label class="form-label">內容 (備註)</label>
                                     <input type="text" class="form-control" id="descInput">
@@ -143,7 +146,16 @@
                         <div class="card-body">
                             <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                                 <table class="table table-hover table-sm sticky-top">
-                                    <thead class="table-light"><tr><th class="id-col">序號</th><th>日期</th><th>分類</th><th>內容</th><th class="text-end">金額</th><th>操作</th></tr></thead>
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="id-col">序號</th>
+                                            <th class="sort-header" onclick="sortBy('date')">日期 <i id="sort-date" class="fas fa-sort-down sort-active sort-icon"></i></th>
+                                            <th class="sort-header" onclick="sortBy('category')">分類 <i id="sort-category" class="fas fa-sort sort-icon"></i></th>
+                                            <th class="sort-header" onclick="sortBy('desc')">內容 <i id="sort-desc" class="fas fa-sort sort-icon"></i></th>
+                                            <th class="sort-header text-end" onclick="sortBy('amount')">金額 <i id="sort-amount" class="fas fa-sort sort-icon"></i></th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
                                     <tbody id="transactionList"></tbody>
                                 </table>
                             </div>
@@ -176,10 +188,7 @@
             <div class="card mb-4 border-warning">
                 <div class="card-header bg-warning text-dark"><i class="fas fa-utensils"></i> 餐費支出選項設定 (雲端同步)</div>
                 <div class="card-body">
-                    <div class="input-group mb-2">
-                        <input type="text" class="form-control" id="newMealOpt" placeholder="輸入新店家名稱">
-                        <button class="btn btn-outline-dark" onclick="addMealOption()">新增選項</button>
-                    </div>
+                    <div class="input-group mb-2"><input type="text" class="form-control" id="newMealOpt" placeholder="輸入新店家名稱"><button class="btn btn-outline-dark" onclick="addMealOption()">新增選項</button></div>
                     <div id="mealOptionList" class="d-flex flex-wrap gap-2 p-2 border rounded bg-white"></div>
                 </div>
             </div>
@@ -221,7 +230,10 @@
 
         <div class="tab-pane fade" id="logs">
             <div class="card border-secondary">
-                <div class="card-header bg-secondary text-white"><i class="fas fa-history"></i> 雲端操作紀錄</div>
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-history"></i> 雲端操作紀錄</span>
+                    <button class="btn btn-success btn-sm" onclick="exportLogs()"><i class="fas fa-file-excel"></i> 匯出紀錄 (Excel)</button>
+                </div>
                 <div class="card-body">
                     <div class="table-responsive"><table class="table table-striped table-sm" style="font-size: 0.8rem;"><thead><tr><th style="width:140px;">時間</th><th style="width:100px;">操作者</th><th style="width:80px;">動作</th><th>詳情 (系統序號/類型/分類/金額/備註)</th></tr></thead><tbody id="logListBody"></tbody></table></div>
                 </div>
@@ -241,6 +253,10 @@
     let cloudLogs = [];
     let currentUser = null;
     let sessionActions = [];
+    
+    // 排序狀態 (新增)
+    let sortKey = 'date';
+    let sortOrder = 'desc';
     
     let settings = {
         expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"],
@@ -264,11 +280,8 @@
                 if(res.data.settings) settings = res.data.settings;
                 let foundUser = users.find(x => String(x.username) === u && String(x.password) === p);
                 if(!foundUser && u === 'admin' && p === '54381017') foundUser = { username: 'admin', role: 'admin', name: '系統預設管理員' };
-                if(foundUser) {
-                    currentUser = foundUser;
-                    sessionActions = []; 
-                    loginSuccess();
-                } else { document.getElementById('loginError').innerText = '帳號或密碼錯誤'; }
+                if(foundUser) { currentUser = foundUser; sessionActions = []; loginSuccess(); } 
+                else { document.getElementById('loginError').innerText = '帳號或密碼錯誤'; }
             } else { alert('連線失敗'); }
         })
         .catch(err => { console.error(err); alert('網路錯誤'); })
@@ -343,7 +356,7 @@
 
         const editId = document.getElementById('editId').value;
         const payload = {
-            op: editId ? 'edit' : 'add', tableName: 'transactions', id: editId ? editId : null, // ID 留空給後端生成
+            op: editId ? 'edit' : 'add', tableName: 'transactions', id: editId ? editId : null,
             date: document.getElementById('date').value, type: document.getElementById('type').value, category: cat,
             amount: document.getElementById('amount').value, desc: finalDesc, createdBy: currentUser.username
         };
@@ -353,7 +366,6 @@
             if(isNewMeal) { saveSettingsToCloud(); renderSettings(); }
         });
 
-        // 本地紀錄 session (僅供登出信參考，ID 尚未知)
         sessionActions.push({ action: editId ? '修改' : '新增', category: cat, amount: payload.amount, desc: finalDesc + (editId?` (ID:${editId})` : ' (新資料)') });
     });
 
@@ -388,15 +400,42 @@
     function renderUserList() { const tbody = document.getElementById('userListBody'); tbody.innerHTML = ''; cloudUsers.forEach(u => { const delBtn = u.username==='admin'||u.username===currentUser.username?'-':`<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`; tbody.innerHTML+=`<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${delBtn}</td></tr>`; }); }
     function renderLogs() { const tbody = document.getElementById('logListBody'); tbody.innerHTML = ''; cloudLogs.slice().reverse().slice(0, 100).forEach(log => { tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`; }); }
 
-    // 7. 渲染表格 (含序號開關)
+    // 7. 渲染表格 (排序功能 + 序號開關)
+    function sortBy(key) {
+        if(sortKey === key) {
+            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortKey = key;
+            sortOrder = 'desc'; // 切換欄位時預設降冪 (如日期最新、金額最大)
+        }
+        renderTable();
+    }
+
     function renderTable() {
         const tbody = document.getElementById('transactionList'); tbody.innerHTML = ''; let balance = 0;
         const showId = document.getElementById('toggleId').checked;
         
+        // 更新排序圖示
+        document.querySelectorAll('.sort-icon').forEach(i => i.className = 'fas fa-sort sort-icon');
+        const icon = document.getElementById(`sort-${sortKey}`);
+        if(icon) icon.className = `fas fa-sort-${sortOrder === 'asc' ? 'up' : 'down'} sort-icon sort-active`;
+
         // 隱藏/顯示 ID 欄位
         document.querySelectorAll('.id-col').forEach(el => el.style.display = showId ? '' : 'none');
         
-        transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
+        // 執行排序
+        transactions.sort((a,b) => {
+            let valA = a[sortKey];
+            let valB = b[sortKey];
+            
+            // 處理數字排序
+            if(sortKey === 'amount') { valA = parseFloat(valA); valB = parseFloat(valB); }
+            
+            if(valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if(valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+
         transactions.forEach(t => {
             if(t.type === 'income') balance += parseInt(t.amount); else balance -= parseInt(t.amount);
             const tr = document.createElement('tr');
@@ -427,7 +466,6 @@
         exportComplexExcel(startStr, endStr);
     }
 
-    // 🔥 Excel 匯出 (版面優化版)
     function exportComplexExcel(startOverride, endOverride) {
         const s = startOverride || document.getElementById('reportStartDate').value;
         const e = endOverride || document.getElementById('reportEndDate').value;
@@ -435,42 +473,39 @@
         const d = getReportData(s, e);
         const wb = XLSX.utils.book_new();
 
-        // Sheet 1: 明細 (含序號)
         let detailData = [['系統序號', '日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']];
         d.periodData.forEach(t => { detailData.push([ t.id, t.date, t.type==='income'?'收入':'支出', t.category, t.desc, t.type==='income'?parseInt(t.amount):0, t.type==='expense'?parseInt(t.amount):0, t.createdBy||'' ]); });
         const ws1 = XLSX.utils.aoa_to_sheet(detailData); ws1['!cols'] = [{wch:15}, {wch:12}, {wch:8}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}];
         XLSX.utils.book_append_sheet(wb, ws1, "期間帳務明細");
 
-        // Sheet 2: 總表 (左右分欄設計)
-        let summaryData = [
-            ['統計期間', `${s} ~ ${e}`, '', '製表時間', new Date().toLocaleString()],
-            ['期初餘額', d.openingBalance, '', '', ''],
-            ['', '', '', '', ''],
-            ['【收入項目】', '金額', '', '【支出項目】', '金額']
-        ];
-        
+        let summaryData = [['統計項目', '金額', '說明', '製表時間', new Date().toLocaleString()], ['期初餘額', d.openingBalance, '', '', ''], ['', '', '', '', ''], ['【收入項目】', '金額', '', '【支出項目】', '金額']];
         let incRows = Object.entries(d.incStats).filter(([k,v])=>v>0);
         let expRows = Object.entries(d.expStats).filter(([k,v])=>v>0);
         let maxR = Math.max(incRows.length, expRows.length);
-        
         for(let i=0; i<maxR; i++) {
             let row = [];
-            if(i < incRows.length) { row.push(incRows[i][0], incRows[i][1]); } else { row.push('', ''); }
-            row.push(''); // 分隔欄
-            if(i < expRows.length) { row.push(expRows[i][0], expRows[i][1]); } else { row.push('', ''); }
-            summaryData.push(row);
+            if(i < incRows.length) { row.push(incRows[i][0], incRows[i][1]); } else { row.push('', ''); } row.push(''); 
+            if(i < expRows.length) { row.push(expRows[i][0], expRows[i][1]); } else { row.push('', ''); } summaryData.push(row);
         }
-        
-        summaryData.push(['', '', '', '', '']);
-        summaryData.push(['收入總計', d.totalInc, '', '支出總計', d.totalExp]);
-        summaryData.push(['', '', '', '', '']);
-        summaryData.push(['本期結餘', d.openingBalance + d.totalInc - d.totalExp, '(= 期初 + 收入 - 支出)', '', '']);
-
-        const ws2 = XLSX.utils.aoa_to_sheet(summaryData); 
-        ws2['!cols'] = [{wch:20}, {wch:12}, {wch:5}, {wch:20}, {wch:12}];
+        summaryData.push(['', '', '', '', ''], ['收入總計', d.totalInc, '', '支出總計', d.totalExp], ['', '', '', '', ''], ['本期結餘', d.openingBalance + d.totalInc - d.totalExp, '(= 期初 + 收入 - 支出)', '', '']);
+        const ws2 = XLSX.utils.aoa_to_sheet(summaryData); ws2['!cols'] = [{wch:20}, {wch:12}, {wch:5}, {wch:20}, {wch:12}];
         XLSX.utils.book_append_sheet(wb, ws2, "收支匯整總表");
-
         XLSX.writeFile(wb, `高登科靜修校_報表_${s}_${e}.xlsx`);
+    }
+
+    // 🔥 新增：匯出操作紀錄 (Log Export)
+    function exportLogs() {
+        if (!cloudLogs || cloudLogs.length === 0) { alert('無紀錄可匯出'); return; }
+        const now = new Date();
+        const timestamp = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+        const filename = `${timestamp}-操作記錄.xlsx`;
+
+        const sheetData = cloudLogs.map(log => ({ '時間': log.time, '操作者': log.user, '動作': log.action, '詳情': log.detail }));
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(sheetData);
+        ws['!cols'] = [{wch:20}, {wch:15}, {wch:15}, {wch:50}];
+        XLSX.utils.book_append_sheet(wb, ws, "操作記錄");
+        XLSX.writeFile(wb, filename);
     }
 </script>
 </body>
