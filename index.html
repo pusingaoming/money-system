@@ -14,8 +14,19 @@
         .highlight-red { color: #dc3545; }
         .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 10px; margin-bottom: 20px; }
         .card-header { background-color: #0d6efd; color: white; font-weight: bold; }
-        #amount { background-color: #ffdddd; border-color: #ffcccc; font-weight: bold; }
+        
+        /* 🔴 金額欄位特殊樣式 */
+        #amount { 
+            background-color: #ffcccc; /* 紅色底 */
+            border: 2px solid #ff9999; 
+            font-weight: bold; 
+            font-size: 1.2rem;
+            color: #cc0000;
+        }
+        #amount::placeholder { color: #d9534f; opacity: 0.7; font-size: 1rem;}
+
         .d-none { display: none !important; }
+        .table-hover tbody tr:hover { background-color: #fff8f8; }
         
         #loading-overlay, #login-overlay, #logout-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
@@ -25,6 +36,9 @@
         #login-overlay { background: rgba(255,236,236, 0.98); }
         #logout-overlay { background: rgba(0,0,0,0.85); display: none; }
         .spinner-border { width: 3rem; height: 3rem; }
+        
+        /* 序號欄位樣式 */
+        .col-id { font-family: 'Courier New', monospace; font-weight: bold; color: #555; }
     </style>
 </head>
 <body>
@@ -94,7 +108,12 @@
                                 <div class="mb-3"><label class="form-label">日期</label><input type="date" class="form-control" id="date" required></div>
                                 <div class="mb-3"><label class="form-label">收支類型</label><select class="form-select" id="type" onchange="updateCategoriesFromSettings()" required><option value="expense" selected>支出</option><option value="income">收入</option></select></div>
                                 <div class="mb-3"><label class="form-label">項目分類</label><select class="form-select" id="category" required onchange="checkMealCategory()"></select></div>
-                                <div class="mb-3"><label class="form-label">金額</label><input type="number" class="form-control" id="amount" placeholder="輸入金額" required></div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-danger">金額</label>
+                                    <input type="number" class="form-control" id="amount" placeholder="請在此輸入金額" required>
+                                </div>
+                                
                                 <div class="mb-3">
                                     <label class="form-label">內容 (備註)</label>
                                     <input type="text" class="form-control" id="descInput">
@@ -110,13 +129,21 @@
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-list"></i> 雲端資料列表 <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄</button></span>
-                            <span id="currentBalance" class="badge bg-warning text-dark">0</span>
+                            <span><i class="fas fa-list"></i> 雲端資料列表 
+                                <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄</button>
+                            </span>
+                            <div>
+                                <div class="form-check form-switch d-inline-block me-3">
+                                    <input class="form-check-input" type="checkbox" id="toggleId" checked onchange="renderTable()">
+                                    <label class="form-check-label text-white small" for="toggleId">顯示序號</label>
+                                </div>
+                                <span id="currentBalance" class="badge bg-warning text-dark">0</span>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                                 <table class="table table-hover table-sm sticky-top">
-                                    <thead class="table-light"><tr><th>日期</th><th>分類</th><th>內容</th><th class="text-end">金額</th><th>操作</th></tr></thead>
+                                    <thead class="table-light"><tr><th class="id-col">序號</th><th>日期</th><th>分類</th><th>內容</th><th class="text-end">金額</th><th>操作</th></tr></thead>
                                     <tbody id="transactionList"></tbody>
                                 </table>
                             </div>
@@ -149,7 +176,6 @@
             <div class="card mb-4 border-warning">
                 <div class="card-header bg-warning text-dark"><i class="fas fa-utensils"></i> 餐費支出選項設定 (雲端同步)</div>
                 <div class="card-body">
-                    <p class="text-muted small">此處新增或修改的選項會同步至雲端系統。</p>
                     <div class="input-group mb-2">
                         <input type="text" class="form-control" id="newMealOpt" placeholder="輸入新店家名稱">
                         <button class="btn btn-outline-dark" onclick="addMealOption()">新增選項</button>
@@ -197,7 +223,7 @@
             <div class="card border-secondary">
                 <div class="card-header bg-secondary text-white"><i class="fas fa-history"></i> 雲端操作紀錄</div>
                 <div class="card-body">
-                    <div class="table-responsive"><table class="table table-striped table-sm" style="font-size: 0.85rem;"><thead><tr><th style="width:160px;">時間</th><th>操作人員</th><th>動作</th><th>詳情</th></tr></thead><tbody id="logListBody"></tbody></table></div>
+                    <div class="table-responsive"><table class="table table-striped table-sm" style="font-size: 0.8rem;"><thead><tr><th style="width:140px;">時間</th><th style="width:100px;">操作者</th><th style="width:80px;">動作</th><th>詳情 (系統序號/類型/分類/金額/備註)</th></tr></thead><tbody id="logListBody"></tbody></table></div>
                 </div>
             </div>
         </div>
@@ -209,15 +235,13 @@
 <script>
     // ▼▼▼ 您的網址 ▼▼▼
     const scriptURL = 'https://script.google.com/macros/s/AKfycbzGnWo-GWlavpYjMb5I6IwCIAsMlSeu2eHou2chlJPJELckyTU7bsln1Ho7F68n2VA-Gw/exec';
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
+    
     let transactions = [];
     let cloudUsers = [];
     let cloudLogs = [];
     let currentUser = null;
-    let sessionActions = []; // 🔥 存放本次登入的操作，登出時才寄信
+    let sessionActions = [];
     
-    // 預設設定 (若雲端沒資料時使用)
     let settings = {
         expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"],
         income: ["入帳(零用金)", "學生轉入餐費", "其他收入"],
@@ -237,15 +261,12 @@
         .then(res => {
             if(res.result === 'success') {
                 const users = res.data.users;
-                // 若雲端有設定，則覆蓋本地設定 (同步機制)
                 if(res.data.settings) settings = res.data.settings;
-                
                 let foundUser = users.find(x => String(x.username) === u && String(x.password) === p);
                 if(!foundUser && u === 'admin' && p === '54381017') foundUser = { username: 'admin', role: 'admin', name: '系統預設管理員' };
-
                 if(foundUser) {
                     currentUser = foundUser;
-                    sessionActions = []; // 清空操作紀錄
+                    sessionActions = []; 
                     loginSuccess();
                 } else { document.getElementById('loginError').innerText = '帳號或密碼錯誤'; }
             } else { alert('連線失敗'); }
@@ -263,34 +284,20 @@
             document.getElementById('adminTab').classList.remove('d-none');
             document.getElementById('logTab').classList.remove('d-none');
         }
-        renderSettings();
-        updateCategoriesFromSettings();
-        fetchCloudData();
-        logToCloud('登入', '使用者登入系統');
+        renderSettings(); updateCategoriesFromSettings(); fetchCloudData();
     }
 
-    // 2. 登出與寄信
+    // 2. 登出
     function finalLogout() {
         showLoading('正在匯總資料並發送通知...');
-        
-        // 傳送 sessionActions 給後端發信
         fetch(scriptURL, {
             method: 'POST',
-            body: JSON.stringify({
-                op: 'send_summary',
-                user: currentUser.name,
-                time: new Date().toLocaleString(),
-                summary: sessionActions
-            }),
+            body: JSON.stringify({ op: 'send_summary', user: currentUser.name, time: new Date().toLocaleString(), summary: sessionActions }),
             headers: { "Content-Type": "text/plain;charset=utf-8" }
-        })
-        .then(res => res.json())
-        .finally(() => {
-            location.reload(); // 無論寄信成功與否，最後都重整登出
-        });
+        }).finally(() => { location.reload(); });
     }
 
-    // 3. 雲端通訊
+    // 3. 通訊
     function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading-overlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
     function fetchCloudData() {
@@ -300,12 +307,7 @@
                 transactions = res.data.transactions;
                 cloudUsers = res.data.users;
                 cloudLogs = res.data.logs;
-                // 同步設定
-                if(res.data.settings) {
-                    settings = res.data.settings;
-                    renderSettings();
-                    updateCategoriesFromSettings();
-                }
+                if(res.data.settings) { settings = res.data.settings; renderSettings(); updateCategoriesFromSettings(); }
                 renderTable(); updatePreviewStats();
                 if(currentUser && currentUser.role === 'admin') { renderUserList(); renderLogs(); }
             }
@@ -321,127 +323,85 @@
             } else { alert('操作失敗: ' + res.message); }
         }).finally(() => hideLoading());
     }
-    
-    // 儲存設定到雲端
-    function saveSettingsToCloud() {
-        // 不顯示 Loading，背景儲存
-        fetch(scriptURL, {
-            method: 'POST',
-            body: JSON.stringify({ op: 'save_settings', settings: settings }),
-            headers: { "Content-Type": "text/plain;charset=utf-8" }
-        });
-    }
-
-    function logToCloud(action, detail) {
-        if(!currentUser) return;
-        fetch(scriptURL, { method: 'POST', body: JSON.stringify({ op: 'add', tableName: 'logs', user: currentUser.username, action: action, detail: detail }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-    }
+    function saveSettingsToCloud() { fetch(scriptURL, { method: 'POST', body: JSON.stringify({ op: 'save_settings', settings: settings }), headers: { "Content-Type": "text/plain;charset=utf-8" } }); }
 
     // 4. 帳務與自動學習
     document.getElementById('accountForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const cat = document.getElementById('category').value;
-        let finalDesc;
-        let isNewMeal = false;
+        let finalDesc; let isNewMeal = false;
         
         if (cat === '餐費支出') {
             const selectVal = document.getElementById('descSelect').value;
             if (selectVal === 'other') {
                 finalDesc = document.getElementById('descOtherInput').value.trim();
                 if (finalDesc && !settings.mealOptions.includes(finalDesc)) {
-                    settings.mealOptions.push(finalDesc);
-                    isNewMeal = true;
+                    settings.mealOptions.push(finalDesc); isNewMeal = true;
                 }
             } else { finalDesc = selectVal; }
         } else { finalDesc = document.getElementById('descInput').value.trim(); }
 
         const editId = document.getElementById('editId').value;
         const payload = {
-            op: editId ? 'edit' : 'add', tableName: 'transactions', id: editId ? editId : Date.now(),
+            op: editId ? 'edit' : 'add', tableName: 'transactions', id: editId ? editId : null, // ID 留空給後端生成
             date: document.getElementById('date').value, type: document.getElementById('type').value, category: cat,
             amount: document.getElementById('amount').value, desc: finalDesc, createdBy: currentUser.username
         };
         
         sendCloudCommand(payload, editId ? '修改成功' : '記錄並送出成功', () => {
             cancelEdit();
-            if(isNewMeal) { saveSettingsToCloud(); renderSettings(); } // 新增店家後同步雲端
+            if(isNewMeal) { saveSettingsToCloud(); renderSettings(); }
         });
 
-        // 加入暫存，準備登出時寄信
-        if(!editId) {
-            sessionActions.push({ action: '新增', category: cat, amount: payload.amount, desc: finalDesc });
-            logToCloud('新增交易', `${cat} $${payload.amount}`);
-        } else {
-            sessionActions.push({ action: '修改', category: cat, amount: payload.amount, desc: finalDesc });
-            logToCloud('修改交易', `ID: ${editId}`);
-        }
+        // 本地紀錄 session (僅供登出信參考，ID 尚未知)
+        sessionActions.push({ action: editId ? '修改' : '新增', category: cat, amount: payload.amount, desc: finalDesc + (editId?` (ID:${editId})` : ' (新資料)') });
     });
 
     function deleteTrans(id) { 
         if(confirm('確定刪除？')) { 
             sendCloudCommand({ op: 'delete', tableName: 'transactions', id: id }, '刪除成功'); 
             sessionActions.push({ action: '刪除', category: '-', amount: '-', desc: `ID:${id}` });
-            logToCloud('刪除交易', `ID: ${id}`); 
         } 
     }
 
-    // 5. 設定管理 (CRUD 並同步雲端)
+    // 5. 設定管理
     function addCategory(t){ const v=document.getElementById(t==='expense'?'newExpenseCat':'newIncomeCat').value.trim(); if(v){settings[t].push(v); saveSettingsToCloud(); renderSettings(); updateCategoriesFromSettings();}}
     function removeCat(t,i){if(confirm('確定刪除？')){settings[t].splice(i,1); saveSettingsToCloud(); renderSettings(); updateCategoriesFromSettings();}}
-    
     function addMealOption() { const v = document.getElementById('newMealOpt').value.trim(); if(v && !settings.mealOptions.includes(v)) { settings.mealOptions.push(v); saveSettingsToCloud(); renderSettings(); document.getElementById('newMealOpt').value = ''; } }
     function removeMealOpt(i) { if(confirm('確定刪除？')) { settings.mealOptions.splice(i, 1); saveSettingsToCloud(); renderSettings(); } }
-    function editMealOpt(i) { 
-        const old = settings.mealOptions[i]; const n = prompt("修改名稱:", old); 
-        if(n && n.trim()!==old){ 
-            settings.mealOptions[i]=n.trim(); 
-            saveSettingsToCloud(); // 修改後立即同步
-            renderSettings(); 
-        } 
-    }
-
+    function editMealOpt(i) { const old = settings.mealOptions[i]; const n = prompt("修改名稱:", old); if(n && n.trim()!==old){ settings.mealOptions[i]=n.trim(); saveSettingsToCloud(); renderSettings(); } }
+    
     function renderSettings() { 
         const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; 
         r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); 
         const m = document.getElementById('mealOptionList'); m.innerHTML=''; 
-        settings.mealOptions.forEach((o,i) => {
-            m.innerHTML += `<div class="badge bg-warning text-dark p-2 border me-1 mb-1">${o} <i class="fas fa-edit ms-1" style="cursor:pointer" onclick="editMealOpt(${i})"></i><i class="fas fa-times ms-1" style="cursor:pointer" onclick="removeMealOpt(${i})"></i></div>`;
-        });
+        settings.mealOptions.forEach((o,i) => { m.innerHTML += `<div class="badge bg-warning text-dark p-2 border me-1 mb-1">${o} <i class="fas fa-edit ms-1" style="cursor:pointer" onclick="editMealOpt(${i})"></i><i class="fas fa-times ms-1" style="cursor:pointer" onclick="removeMealOpt(${i})"></i></div>`; });
     }
 
-    // 6. 使用者管理
+    // 6. 使用者 & 紀錄
     document.getElementById('newUserForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const newU = document.getElementById('newUsername').value.trim();
+        e.preventDefault(); const newU = document.getElementById('newUsername').value.trim();
         if(cloudUsers.some(x => String(x.username) === newU)) { alert('帳號已存在'); return; }
-        const payload = { op: 'add', tableName: 'users', username: newU, name: document.getElementById('newRealname').value.trim(), password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value };
-        sendCloudCommand(payload, '使用者新增成功', () => document.getElementById('newUserForm').reset());
-        logToCloud('新增人員', `帳號: ${newU}`);
+        sendCloudCommand({ op: 'add', tableName: 'users', username: newU, name: document.getElementById('newRealname').value.trim(), password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value }, '使用者新增成功', () => document.getElementById('newUserForm').reset());
     });
-    function deleteUser(username) {
-        if(username === 'admin') { alert('無法刪除預設管理員'); return; }
-        if(confirm(`確定刪除使用者 ${username} 嗎？`)) { sendCloudCommand({ op: 'delete', tableName: 'users', id: username }, '刪除成功'); logToCloud('刪除人員', `帳號: ${username}`); }
-    }
-    function renderUserList() {
-        const tbody = document.getElementById('userListBody'); tbody.innerHTML = '';
-        cloudUsers.forEach(u => {
-            const delBtn = u.username === 'admin' || u.username === currentUser.username ? '-' : `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`;
-            tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${delBtn}</td></tr>`;
-        });
-    }
-    function renderLogs() {
-        const tbody = document.getElementById('logListBody'); tbody.innerHTML = '';
-        cloudLogs.slice().reverse().slice(0, 100).forEach(log => { tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`; });
-    }
+    function deleteUser(u) { if(u==='admin'){alert('不可刪除管理員');return;} if(confirm('確定刪除？')) sendCloudCommand({op:'delete',tableName:'users',id:u},'刪除成功'); }
+    function renderUserList() { const tbody = document.getElementById('userListBody'); tbody.innerHTML = ''; cloudUsers.forEach(u => { const delBtn = u.username==='admin'||u.username===currentUser.username?'-':`<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`; tbody.innerHTML+=`<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${delBtn}</td></tr>`; }); }
+    function renderLogs() { const tbody = document.getElementById('logListBody'); tbody.innerHTML = ''; cloudLogs.slice().reverse().slice(0, 100).forEach(log => { tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`; }); }
 
-    // 7. 渲染 & 報表
+    // 7. 渲染表格 (含序號開關)
     function renderTable() {
         const tbody = document.getElementById('transactionList'); tbody.innerHTML = ''; let balance = 0;
+        const showId = document.getElementById('toggleId').checked;
+        
+        // 隱藏/顯示 ID 欄位
+        document.querySelectorAll('.id-col').forEach(el => el.style.display = showId ? '' : 'none');
+        
         transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
         transactions.forEach(t => {
             if(t.type === 'income') balance += parseInt(t.amount); else balance -= parseInt(t.amount);
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${t.date}</td><td><span class="badge bg-light text-dark border">${t.category}</span></td><td>${t.desc}</td><td class="text-end text-${t.type==='income'?'success':'danger'}">${parseInt(t.amount).toLocaleString()}</td>
+            tr.innerHTML = `<td class="id-col col-id" style="${showId?'':'display:none'}">${t.id}</td>
+                <td>${t.date}</td><td><span class="badge bg-light text-dark border">${t.category}</span></td><td>${t.desc}</td><td class="text-end text-${t.type==='income'?'success':'danger'}">${parseInt(t.amount).toLocaleString()}</td>
                 <td><button class="btn btn-sm btn-outline-primary" onclick="editTrans('${t.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteTrans('${t.id}')"><i class="fas fa-trash"></i></button></td>`;
             tbody.appendChild(tr);
         });
@@ -449,11 +409,7 @@
     }
     
     function editTrans(id){ const t=transactions.find(x=>String(x.id)===String(id)); if(!t)return; document.getElementById('editId').value=t.id; document.getElementById('date').value=t.date; document.getElementById('type').value=t.type; document.getElementById('amount').value=t.amount; updateCategoriesFromSettings(); document.getElementById('category').value=t.category; checkMealCategory(); 
-        if(t.category==='餐費支出'){
-            const sel=document.getElementById('descSelect'); 
-            if(settings.mealOptions.includes(t.desc)) sel.value=t.desc; 
-            else{ sel.value='other'; document.getElementById('descOtherInput').value=t.desc; checkMealOption(); }
-        }else{document.getElementById('descInput').value=t.desc;} 
+        if(t.category==='餐費支出'){ const sel=document.getElementById('descSelect'); if(settings.mealOptions.includes(t.desc)) sel.value=t.desc; else{ sel.value='other'; document.getElementById('descOtherInput').value=t.desc; checkMealOption(); } }else{document.getElementById('descInput').value=t.desc;} 
         document.getElementById('formTitle').innerText='修改模式'; document.getElementById('formTitle').className='card-header bg-warning text-dark'; document.getElementById('submitBtn').innerHTML='💾 儲存修改'; document.getElementById('submitBtn').className='btn btn-warning w-100'; document.getElementById('cancelEditBtn').classList.remove('d-none'); window.scrollTo({top:0,behavior:'smooth'}); 
     }
     function cancelEdit(){ document.getElementById('accountForm').reset(); document.getElementById('editId').value=''; document.getElementById('date').value=getTodayString(); document.getElementById('formTitle').innerText='新增交易'; document.getElementById('formTitle').className='card-header bg-primary text-white'; document.getElementById('submitBtn').innerHTML='<i class="fas fa-check"></i> 記錄並送出'; document.getElementById('submitBtn').className='btn btn-primary w-100'; document.getElementById('cancelEditBtn').classList.add('d-none'); checkMealCategory(); }
@@ -466,28 +422,54 @@
     function updatePreviewStats() { const s=document.getElementById('reportStartDate').value, e=document.getElementById('reportEndDate').value; if(!s||!e)return; const d = getReportData(s,e); const ib=document.getElementById('preview-income-body'), eb=document.getElementById('preview-expense-body'); ib.innerHTML=`<tr><td>上期餘額</td><td class="text-end">${d.openingBalance.toLocaleString()}</td></tr>`; eb.innerHTML=''; for(const[c,v]of Object.entries(d.incStats))if(v>0)ib.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; for(const[c,v]of Object.entries(d.expStats))if(v>0)eb.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; const g=d.totalInc+d.openingBalance; document.getElementById('preview-final-balance').textContent=(g-d.totalExp).toLocaleString(); }
     
     function exportLastMonthData() {
-        const today = new Date();
-        const endStr = today.toISOString().slice(0,10);
-        const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1);
-        const startStr = lastMonth.toISOString().slice(0,10);
+        const today = new Date(); const endStr = today.toISOString().slice(0,10);
+        const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1); const startStr = lastMonth.toISOString().slice(0,10);
         exportComplexExcel(startStr, endStr);
     }
 
+    // 🔥 Excel 匯出 (版面優化版)
     function exportComplexExcel(startOverride, endOverride) {
         const s = startOverride || document.getElementById('reportStartDate').value;
         const e = endOverride || document.getElementById('reportEndDate').value;
         if(!s || !e) { alert('請選擇日期'); return; }
         const d = getReportData(s, e);
         const wb = XLSX.utils.book_new();
-        let detailData = [['日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']];
-        d.periodData.forEach(t => { detailData.push([ t.date, t.type === 'income' ? '收入' : '支出', t.category, t.desc, t.type === 'income' ? parseInt(t.amount) : 0, t.type === 'expense' ? parseInt(t.amount) : 0, t.createdBy || '' ]); });
-        const ws1 = XLSX.utils.aoa_to_sheet(detailData); ws1['!cols'] = [{wch:12}, {wch:10}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}];
+
+        // Sheet 1: 明細 (含序號)
+        let detailData = [['系統序號', '日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']];
+        d.periodData.forEach(t => { detailData.push([ t.id, t.date, t.type==='income'?'收入':'支出', t.category, t.desc, t.type==='income'?parseInt(t.amount):0, t.type==='expense'?parseInt(t.amount):0, t.createdBy||'' ]); });
+        const ws1 = XLSX.utils.aoa_to_sheet(detailData); ws1['!cols'] = [{wch:15}, {wch:12}, {wch:8}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}];
         XLSX.utils.book_append_sheet(wb, ws1, "期間帳務明細");
-        let summaryData = [['統計項目', '金額', '說明'], ['統計期間', `${s} ~ ${e}`, ''], ['期初餘額', d.openingBalance, '結轉上期累積餘額'], ['', '', ''], ['【收入統計】', '', '']];
-        for(let [cat, amt] of Object.entries(d.incStats)) { if(amt > 0) summaryData.push([cat, amt, '收入分類小計']); } summaryData.push(['收入總計', d.totalInc, '本期總收入'], ['', '', ''], ['【支出統計】', '', '']);
-        for(let [cat, amt] of Object.entries(d.expStats)) { if(amt > 0) summaryData.push([cat, amt, '支出分類小計']); } summaryData.push(['支出總計', d.totalExp, '本期總支出'], ['', '', ''], ['本期結餘', d.openingBalance + d.totalInc - d.totalExp, '期初 + 總收入 - 總支出']);
-        const ws2 = XLSX.utils.aoa_to_sheet(summaryData); ws2['!cols'] = [{wch:20}, {wch:15}, {wch:25}];
+
+        // Sheet 2: 總表 (左右分欄設計)
+        let summaryData = [
+            ['統計期間', `${s} ~ ${e}`, '', '製表時間', new Date().toLocaleString()],
+            ['期初餘額', d.openingBalance, '', '', ''],
+            ['', '', '', '', ''],
+            ['【收入項目】', '金額', '', '【支出項目】', '金額']
+        ];
+        
+        let incRows = Object.entries(d.incStats).filter(([k,v])=>v>0);
+        let expRows = Object.entries(d.expStats).filter(([k,v])=>v>0);
+        let maxR = Math.max(incRows.length, expRows.length);
+        
+        for(let i=0; i<maxR; i++) {
+            let row = [];
+            if(i < incRows.length) { row.push(incRows[i][0], incRows[i][1]); } else { row.push('', ''); }
+            row.push(''); // 分隔欄
+            if(i < expRows.length) { row.push(expRows[i][0], expRows[i][1]); } else { row.push('', ''); }
+            summaryData.push(row);
+        }
+        
+        summaryData.push(['', '', '', '', '']);
+        summaryData.push(['收入總計', d.totalInc, '', '支出總計', d.totalExp]);
+        summaryData.push(['', '', '', '', '']);
+        summaryData.push(['本期結餘', d.openingBalance + d.totalInc - d.totalExp, '(= 期初 + 收入 - 支出)', '', '']);
+
+        const ws2 = XLSX.utils.aoa_to_sheet(summaryData); 
+        ws2['!cols'] = [{wch:20}, {wch:12}, {wch:5}, {wch:20}, {wch:12}];
         XLSX.utils.book_append_sheet(wb, ws2, "收支匯整總表");
+
         XLSX.writeFile(wb, `高登科靜修校_報表_${s}_${e}.xlsx`);
     }
 </script>
