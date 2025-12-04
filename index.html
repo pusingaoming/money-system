@@ -15,7 +15,6 @@
         .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 10px; margin-bottom: 20px; }
         .card-header { background-color: #0d6efd; color: white; font-weight: bold; }
         
-        /* 金額欄位特殊樣式 */
         #amount { 
             background-color: #ffcccc; 
             border: 2px solid #ff9999; 
@@ -36,10 +35,7 @@
         #login-overlay { background: rgba(255,236,236, 0.98); }
         #logout-overlay { background: rgba(0,0,0,0.85); display: none; }
         .spinner-border { width: 3rem; height: 3rem; }
-        
         .col-id { font-family: 'Courier New', monospace; font-weight: bold; color: #555; }
-        
-        /* 排序標題樣式 */
         .sort-header { cursor: pointer; user-select: none; }
         .sort-header:hover { background-color: #e9ecef; }
         .sort-icon { font-size: 0.8em; margin-left: 5px; color: #aaa; }
@@ -113,10 +109,7 @@
                                 <div class="mb-3"><label class="form-label">日期</label><input type="date" class="form-control" id="date" required></div>
                                 <div class="mb-3"><label class="form-label">收支類型</label><select class="form-select" id="type" onchange="updateCategoriesFromSettings()" required><option value="expense" selected>支出</option><option value="income">收入</option></select></div>
                                 <div class="mb-3"><label class="form-label">項目分類</label><select class="form-select" id="category" required onchange="checkMealCategory()"></select></div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold text-danger">金額</label>
-                                    <input type="number" class="form-control" id="amount" placeholder="請在此輸入金額" required>
-                                </div>
+                                <div class="mb-3"><label class="form-label fw-bold text-danger">金額</label><input type="number" class="form-control" id="amount" placeholder="請在此輸入金額" required></div>
                                 <div class="mb-3">
                                     <label class="form-label">內容 (備註)</label>
                                     <input type="text" class="form-control" id="descInput">
@@ -132,9 +125,7 @@
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-list"></i> 雲端資料列表 
-                                <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄</button>
-                            </span>
+                            <span><i class="fas fa-list"></i> 雲端資料列表 <button class="btn btn-sm btn-light ms-2" onclick="fetchCloudData()">🔄</button></span>
                             <div>
                                 <div class="form-check form-switch d-inline-block me-3">
                                     <input class="form-check-input" type="checkbox" id="toggleId" checked onchange="renderTable()">
@@ -211,13 +202,21 @@
                         <div class="col-md-4">
                             <div class="card bg-light">
                                 <div class="card-body">
-                                    <h6 class="card-title">新增使用者</h6>
+                                    <h6 class="card-title" id="userFormTitle">新增使用者</h6>
                                     <form id="newUserForm">
-                                        <div class="mb-2"><input type="text" class="form-control" id="newUsername" placeholder="帳號" required></div>
+                                        <input type="hidden" id="isEditUser" value="false">
+                                        <div class="mb-2">
+                                            <label class="small text-muted">帳號 (支援0開頭數字)</label>
+                                            <input type="text" class="form-control" id="newUsername" placeholder="輸入帳號" required>
+                                        </div>
                                         <div class="mb-2"><input type="text" class="form-control" id="newRealname" placeholder="顯示名稱" required></div>
-                                        <div class="mb-2"><input type="password" class="form-control" id="newPassword" placeholder="密碼" required></div>
+                                        <div class="mb-2">
+                                            <label class="small text-muted">密碼 (支援0開頭數字)</label>
+                                            <input type="text" class="form-control" id="newPassword" placeholder="輸入密碼" required>
+                                        </div>
                                         <div class="mb-2"><select class="form-select" id="newRole"><option value="user">一般使用者</option><option value="admin">管理者</option></select></div>
-                                        <button type="submit" class="btn btn-primary w-100">建立雲端帳號</button>
+                                        <button type="submit" class="btn btn-primary w-100" id="userSubmitBtn">建立雲端帳號</button>
+                                        <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="cancelUserEditBtn" onclick="cancelUserEdit()">取消修改</button>
                                     </form>
                                 </div>
                             </div>
@@ -248,21 +247,9 @@
     // ▼▼▼ 您的網址 ▼▼▼
     const scriptURL = 'https://script.google.com/macros/s/AKfycbzGnWo-GWlavpYjMb5I6IwCIAsMlSeu2eHou2chlJPJELckyTU7bsln1Ho7F68n2VA-Gw/exec';
     
-    let transactions = [];
-    let cloudUsers = [];
-    let cloudLogs = [];
-    let currentUser = null;
-    let sessionActions = [];
-    
-    // 排序狀態 (新增)
-    let sortKey = 'date';
-    let sortOrder = 'desc';
-    
-    let settings = {
-        expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"],
-        income: ["入帳(零用金)", "學生轉入餐費", "其他收入"],
-        mealOptions: ["天食鍋燒", "B鴨董", "來碗粥", "飯卷", "水餃峰", "太祖魷魚羮", "八方鍋胋", "阿胖食堂", "點心"]
-    };
+    let transactions = []; let cloudUsers = []; let cloudLogs = []; let currentUser = null; let sessionActions = [];
+    let sortKey = 'date'; let sortOrder = 'desc';
+    let settings = { expense: ["補習班雜支", "教材文具類支出", "年度教材(帳號/合約)", "餐費支出", "加油", "水電費 電話費", "其他人事支出", "車輛相關支出"], income: ["入帳(零用金)", "學生轉入餐費", "其他收入"], mealOptions: ["天食鍋燒", "B鴨董", "來碗粥", "飯卷", "水餃峰", "太祖魷魚羮", "八方鍋胋", "阿胖食堂", "點心"] };
 
     function getTodayString() { const n=new Date(); return new Date(n.getTime()-(n.getTimezoneOffset()*60000)).toISOString().slice(0,10); }
 
@@ -272,20 +259,15 @@
         const u = document.getElementById('loginUser').value.trim();
         const p = document.getElementById('loginPass').value.trim();
         showLoading('正在驗證帳號...');
-        fetch(scriptURL)
-        .then(res => res.json())
-        .then(res => {
+        fetch(scriptURL).then(res => res.json()).then(res => {
             if(res.result === 'success') {
                 const users = res.data.users;
                 if(res.data.settings) settings = res.data.settings;
                 let foundUser = users.find(x => String(x.username) === u && String(x.password) === p);
                 if(!foundUser && u === 'admin' && p === '54381017') foundUser = { username: 'admin', role: 'admin', name: '系統預設管理員' };
-                if(foundUser) { currentUser = foundUser; sessionActions = []; loginSuccess(); } 
-                else { document.getElementById('loginError').innerText = '帳號或密碼錯誤'; }
+                if(foundUser) { currentUser = foundUser; sessionActions = []; loginSuccess(); } else { document.getElementById('loginError').innerText = '帳號或密碼錯誤'; }
             } else { alert('連線失敗'); }
-        })
-        .catch(err => { console.error(err); alert('網路錯誤'); })
-        .finally(() => hideLoading());
+        }).catch(err => { console.error(err); alert('網路錯誤'); }).finally(() => hideLoading());
     });
 
     function loginSuccess() {
@@ -293,21 +275,14 @@
         document.getElementById('main-app').style.display = 'block';
         document.getElementById('displayUsername').innerText = `${currentUser.name} (${currentUser.role==='admin'?'管理員':'使用者'})`;
         document.getElementById('date').value = getTodayString();
-        if(currentUser.role === 'admin') {
-            document.getElementById('adminTab').classList.remove('d-none');
-            document.getElementById('logTab').classList.remove('d-none');
-        }
+        if(currentUser.role === 'admin') { document.getElementById('adminTab').classList.remove('d-none'); document.getElementById('logTab').classList.remove('d-none'); }
         renderSettings(); updateCategoriesFromSettings(); fetchCloudData();
     }
 
     // 2. 登出
     function finalLogout() {
         showLoading('正在匯總資料並發送通知...');
-        fetch(scriptURL, {
-            method: 'POST',
-            body: JSON.stringify({ op: 'send_summary', user: currentUser.name, time: new Date().toLocaleString(), summary: sessionActions }),
-            headers: { "Content-Type": "text/plain;charset=utf-8" }
-        }).finally(() => { location.reload(); });
+        fetch(scriptURL, { method: 'POST', body: JSON.stringify({ op: 'send_summary', user: currentUser.name, time: new Date().toLocaleString(), summary: sessionActions }), headers: { "Content-Type": "text/plain;charset=utf-8" } }).finally(() => { location.reload(); });
     }
 
     // 3. 通訊
@@ -348,9 +323,7 @@
             const selectVal = document.getElementById('descSelect').value;
             if (selectVal === 'other') {
                 finalDesc = document.getElementById('descOtherInput').value.trim();
-                if (finalDesc && !settings.mealOptions.includes(finalDesc)) {
-                    settings.mealOptions.push(finalDesc); isNewMeal = true;
-                }
+                if (finalDesc && !settings.mealOptions.includes(finalDesc)) { settings.mealOptions.push(finalDesc); isNewMeal = true; }
             } else { finalDesc = selectVal; }
         } else { finalDesc = document.getElementById('descInput').value.trim(); }
 
@@ -361,20 +334,11 @@
             amount: document.getElementById('amount').value, desc: finalDesc, createdBy: currentUser.username
         };
         
-        sendCloudCommand(payload, editId ? '修改成功' : '記錄並送出成功', () => {
-            cancelEdit();
-            if(isNewMeal) { saveSettingsToCloud(); renderSettings(); }
-        });
-
+        sendCloudCommand(payload, editId ? '修改成功' : '記錄並送出成功', () => { cancelEdit(); if(isNewMeal) { saveSettingsToCloud(); renderSettings(); } });
         sessionActions.push({ action: editId ? '修改' : '新增', category: cat, amount: payload.amount, desc: finalDesc + (editId?` (ID:${editId})` : ' (新資料)') });
     });
 
-    function deleteTrans(id) { 
-        if(confirm('確定刪除？')) { 
-            sendCloudCommand({ op: 'delete', tableName: 'transactions', id: id }, '刪除成功'); 
-            sessionActions.push({ action: '刪除', category: '-', amount: '-', desc: `ID:${id}` });
-        } 
-    }
+    function deleteTrans(id) { if(confirm('確定刪除？')) { sendCloudCommand({ op: 'delete', tableName: 'transactions', id: id }, '刪除成功'); sessionActions.push({ action: '刪除', category: '-', amount: '-', desc: `ID:${id}` }); } }
 
     // 5. 設定管理
     function addCategory(t){ const v=document.getElementById(t==='expense'?'newExpenseCat':'newIncomeCat').value.trim(); if(v){settings[t].push(v); saveSettingsToCloud(); renderSettings(); updateCategoriesFromSettings();}}
@@ -382,7 +346,6 @@
     function addMealOption() { const v = document.getElementById('newMealOpt').value.trim(); if(v && !settings.mealOptions.includes(v)) { settings.mealOptions.push(v); saveSettingsToCloud(); renderSettings(); document.getElementById('newMealOpt').value = ''; } }
     function removeMealOpt(i) { if(confirm('確定刪除？')) { settings.mealOptions.splice(i, 1); saveSettingsToCloud(); renderSettings(); } }
     function editMealOpt(i) { const old = settings.mealOptions[i]; const n = prompt("修改名稱:", old); if(n && n.trim()!==old){ settings.mealOptions[i]=n.trim(); saveSettingsToCloud(); renderSettings(); } }
-    
     function renderSettings() { 
         const r = (id, list, type) => { const el = document.getElementById(id); el.innerHTML = ''; list.forEach((c, i) => el.innerHTML += `<div class="d-flex justify-content-between p-1 border-bottom"><span>${c}</span><button class="btn btn-sm btn-outline-danger" onclick="removeCat('${type}', ${i})">×</button></div>`); }; 
         r('expenseCatList', settings.expense, 'expense'); r('incomeCatList', settings.income, 'income'); 
@@ -390,50 +353,82 @@
         settings.mealOptions.forEach((o,i) => { m.innerHTML += `<div class="badge bg-warning text-dark p-2 border me-1 mb-1">${o} <i class="fas fa-edit ms-1" style="cursor:pointer" onclick="editMealOpt(${i})"></i><i class="fas fa-times ms-1" style="cursor:pointer" onclick="removeMealOpt(${i})"></i></div>`; });
     }
 
-    // 6. 使用者 & 紀錄
+    // 6. 使用者管理 (新增修改功能)
     document.getElementById('newUserForm').addEventListener('submit', (e) => {
-        e.preventDefault(); const newU = document.getElementById('newUsername').value.trim();
-        if(cloudUsers.some(x => String(x.username) === newU)) { alert('帳號已存在'); return; }
-        sendCloudCommand({ op: 'add', tableName: 'users', username: newU, name: document.getElementById('newRealname').value.trim(), password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value }, '使用者新增成功', () => document.getElementById('newUserForm').reset());
+        e.preventDefault(); 
+        const isEdit = document.getElementById('isEditUser').value === 'true';
+        const newU = document.getElementById('newUsername').value.trim();
+        
+        if(!isEdit && cloudUsers.some(x => String(x.username) === newU)) { alert('帳號已存在'); return; }
+        
+        const payload = { 
+            op: isEdit ? 'edit' : 'add', 
+            tableName: 'users', 
+            username: newU, // 這是 ID (不變)
+            name: document.getElementById('newRealname').value.trim(), 
+            password: document.getElementById('newPassword').value, 
+            role: document.getElementById('newRole').value,
+            currentAdmin: currentUser.username
+        };
+        sendCloudCommand(payload, isEdit ? '修改成功' : '使用者新增成功', () => {
+            cancelUserEdit();
+        });
     });
-    function deleteUser(u) { if(u==='admin'){alert('不可刪除管理員');return;} if(confirm('確定刪除？')) sendCloudCommand({op:'delete',tableName:'users',id:u},'刪除成功'); }
-    function renderUserList() { const tbody = document.getElementById('userListBody'); tbody.innerHTML = ''; cloudUsers.forEach(u => { const delBtn = u.username==='admin'||u.username===currentUser.username?'-':`<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`; tbody.innerHTML+=`<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${delBtn}</td></tr>`; }); }
-    function renderLogs() { const tbody = document.getElementById('logListBody'); tbody.innerHTML = ''; cloudLogs.slice().reverse().slice(0, 100).forEach(log => { tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`; }); }
 
-    // 7. 渲染表格 (排序功能 + 序號開關)
-    function sortBy(key) {
-        if(sortKey === key) {
-            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-        } else {
-            sortKey = key;
-            sortOrder = 'desc'; // 切換欄位時預設降冪 (如日期最新、金額最大)
-        }
-        renderTable();
+    function editUser(u) {
+        const user = cloudUsers.find(x => String(x.username) === String(u));
+        if(!user) return;
+        document.getElementById('isEditUser').value = 'true';
+        document.getElementById('newUsername').value = user.username;
+        document.getElementById('newUsername').disabled = true; // 帳號不可改
+        document.getElementById('newRealname').value = user.name;
+        document.getElementById('newPassword').value = user.password;
+        document.getElementById('newRole').value = user.role;
+        document.getElementById('userFormTitle').innerText = '修改使用者';
+        document.getElementById('userSubmitBtn').innerText = '確認修改';
+        document.getElementById('userSubmitBtn').className = 'btn btn-warning w-100';
+        document.getElementById('cancelUserEditBtn').classList.remove('d-none');
     }
 
+    function cancelUserEdit() {
+        document.getElementById('newUserForm').reset();
+        document.getElementById('isEditUser').value = 'false';
+        document.getElementById('newUsername').disabled = false;
+        document.getElementById('userFormTitle').innerText = '新增使用者';
+        document.getElementById('userSubmitBtn').innerText = '建立雲端帳號';
+        document.getElementById('userSubmitBtn').className = 'btn btn-primary w-100';
+        document.getElementById('cancelUserEditBtn').classList.add('d-none');
+    }
+
+    function deleteUser(u) { if(u==='admin'){alert('不可刪除管理員');return;} if(confirm('確定刪除？')) sendCloudCommand({op:'delete',tableName:'users',id:u, user: currentUser.username},'刪除成功'); }
+    function renderUserList() { 
+        const tbody = document.getElementById('userListBody'); tbody.innerHTML = ''; 
+        cloudUsers.forEach(u => { 
+            const editBtn = u.username==='admin' ? '' : `<button class="btn btn-sm btn-primary me-1" onclick="editUser('${u.username}')">修改</button>`;
+            const delBtn = u.username==='admin'||u.username===currentUser.username?'-':`<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">刪除</button>`; 
+            tbody.innerHTML+=`<tr><td>${u.username}</td><td>${u.name}</td><td>${u.role}</td><td>${editBtn}${delBtn}</td></tr>`; 
+        }); 
+    }
+    
+    function renderLogs() { const tbody = document.getElementById('logListBody'); tbody.innerHTML = ''; cloudLogs.slice().reverse().slice(0, 100).forEach(log => { tbody.innerHTML += `<tr><td>${log.time}</td><td>${log.user}</td><td>${log.action}</td><td>${log.detail}</td></tr>`; }); }
+
+    // 7. 渲染 & 排序
+    function sortBy(key) {
+        if(sortKey === key) { sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'; } else { sortKey = key; sortOrder = 'desc'; }
+        renderTable();
+    }
     function renderTable() {
         const tbody = document.getElementById('transactionList'); tbody.innerHTML = ''; let balance = 0;
         const showId = document.getElementById('toggleId').checked;
-        
-        // 更新排序圖示
         document.querySelectorAll('.sort-icon').forEach(i => i.className = 'fas fa-sort sort-icon');
-        const icon = document.getElementById(`sort-${sortKey}`);
-        if(icon) icon.className = `fas fa-sort-${sortOrder === 'asc' ? 'up' : 'down'} sort-icon sort-active`;
-
-        // 隱藏/顯示 ID 欄位
+        const icon = document.getElementById(`sort-${sortKey}`); if(icon) icon.className = `fas fa-sort-${sortOrder === 'asc' ? 'up' : 'down'} sort-icon sort-active`;
         document.querySelectorAll('.id-col').forEach(el => el.style.display = showId ? '' : 'none');
         
-        // 執行排序
         transactions.sort((a,b) => {
-            let valA = a[sortKey];
-            let valB = b[sortKey];
-            
-            // 處理數字排序
+            let valA = a[sortKey]; let valB = b[sortKey];
             if(sortKey === 'amount') { valA = parseFloat(valA); valB = parseFloat(valB); }
-            
             if(valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if(valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
+            if(valA > valB) return sortOrder === 'asc' ? 1 : -1; return 0;
         });
 
         transactions.forEach(t => {
@@ -447,6 +442,7 @@
         document.getElementById('currentBalance').innerText = '總餘額: ' + balance.toLocaleString();
     }
     
+    // 編輯 & 取消... (同前)
     function editTrans(id){ const t=transactions.find(x=>String(x.id)===String(id)); if(!t)return; document.getElementById('editId').value=t.id; document.getElementById('date').value=t.date; document.getElementById('type').value=t.type; document.getElementById('amount').value=t.amount; updateCategoriesFromSettings(); document.getElementById('category').value=t.category; checkMealCategory(); 
         if(t.category==='餐費支出'){ const sel=document.getElementById('descSelect'); if(settings.mealOptions.includes(t.desc)) sel.value=t.desc; else{ sel.value='other'; document.getElementById('descOtherInput').value=t.desc; checkMealOption(); } }else{document.getElementById('descInput').value=t.desc;} 
         document.getElementById('formTitle').innerText='修改模式'; document.getElementById('formTitle').className='card-header bg-warning text-dark'; document.getElementById('submitBtn').innerHTML='💾 儲存修改'; document.getElementById('submitBtn').className='btn btn-warning w-100'; document.getElementById('cancelEditBtn').classList.remove('d-none'); window.scrollTo({top:0,behavior:'smooth'}); 
@@ -460,52 +456,17 @@
     function getReportData(s,e){ let arr=[...transactions].sort((a,b)=>new Date(a.date)-new Date(b.date)); let open=0, incS={}, expS={}, tI=0, tE=0; settings.income.forEach(c=>incS[c]=0); settings.expense.forEach(c=>expS[c]=0); arr.forEach(t=>{ if(t.date<s){ if(t.type==='income')open+=parseInt(t.amount); else open-=parseInt(t.amount); } else if(t.date>=s && t.date<=e){ if(t.type==='income'){ if(!incS[t.category])incS[t.category]=0; incS[t.category]+=parseInt(t.amount); tI+=parseInt(t.amount); } else{ if(!expS[t.category])expS[t.category]=0; expS[t.category]+=parseInt(t.amount); tE+=parseInt(t.amount); } } }); return {openingBalance:open, periodData:arr.filter(t=>t.date>=s&&t.date<=e), incStats:incS, expStats:expS, totalInc:tI, totalExp:tE}; }
     function updatePreviewStats() { const s=document.getElementById('reportStartDate').value, e=document.getElementById('reportEndDate').value; if(!s||!e)return; const d = getReportData(s,e); const ib=document.getElementById('preview-income-body'), eb=document.getElementById('preview-expense-body'); ib.innerHTML=`<tr><td>上期餘額</td><td class="text-end">${d.openingBalance.toLocaleString()}</td></tr>`; eb.innerHTML=''; for(const[c,v]of Object.entries(d.incStats))if(v>0)ib.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; for(const[c,v]of Object.entries(d.expStats))if(v>0)eb.innerHTML+=`<tr><td>${c}</td><td class="text-end">${v.toLocaleString()}</td></tr>`; const g=d.totalInc+d.openingBalance; document.getElementById('preview-final-balance').textContent=(g-d.totalExp).toLocaleString(); }
     
-    function exportLastMonthData() {
-        const today = new Date(); const endStr = today.toISOString().slice(0,10);
-        const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1); const startStr = lastMonth.toISOString().slice(0,10);
-        exportComplexExcel(startStr, endStr);
-    }
+    function exportLastMonthData() { const today = new Date(); const endStr = today.toISOString().slice(0,10); const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1); const startStr = lastMonth.toISOString().slice(0,10); exportComplexExcel(startStr, endStr); }
+    function exportComplexExcel(startOverride, endOverride) { const s = startOverride || document.getElementById('reportStartDate').value; const e = endOverride || document.getElementById('reportEndDate').value; if(!s || !e) { alert('請選擇日期'); return; } const d = getReportData(s, e); const wb = XLSX.utils.book_new(); let detailData = [['系統序號', '日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']]; d.periodData.forEach(t => { detailData.push([ t.id, t.date, t.type==='income'?'收入':'支出', t.category, t.desc, t.type==='income'?parseInt(t.amount):0, t.type==='expense'?parseInt(t.amount):0, t.createdBy||'' ]); }); const ws1 = XLSX.utils.aoa_to_sheet(detailData); ws1['!cols'] = [{wch:15}, {wch:12}, {wch:8}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}]; XLSX.utils.book_append_sheet(wb, ws1, "期間帳務明細"); let summaryData = [['統計項目', '金額', '說明', '製表時間', new Date().toLocaleString()], ['期初餘額', d.openingBalance, '', '', ''], ['', '', '', '', ''], ['【收入項目】', '金額', '', '【支出項目】', '金額']]; let incRows = Object.entries(d.incStats).filter(([k,v])=>v>0); let expRows = Object.entries(d.expStats).filter(([k,v])=>v>0); let maxR = Math.max(incRows.length, expRows.length); for(let i=0; i<maxR; i++) { let row = []; if(i < incRows.length) { row.push(incRows[i][0], incRows[i][1]); } else { row.push('', ''); } row.push(''); if(i < expRows.length) { row.push(expRows[i][0], expRows[i][1]); } else { row.push('', ''); } summaryData.push(row); } summaryData.push(['', '', '', '', ''], ['收入總計', d.totalInc, '', '支出總計', d.totalExp], ['', '', '', '', ''], ['本期結餘', d.openingBalance + d.totalInc - d.totalExp, '(= 期初 + 收入 - 支出)', '', '']); const ws2 = XLSX.utils.aoa_to_sheet(summaryData); ws2['!cols'] = [{wch:20}, {wch:12}, {wch:5}, {wch:20}, {wch:12}]; XLSX.utils.book_append_sheet(wb, ws2, "收支匯整總表"); XLSX.writeFile(wb, `高登科靜修校_報表_${s}_${e}.xlsx`); }
 
-    function exportComplexExcel(startOverride, endOverride) {
-        const s = startOverride || document.getElementById('reportStartDate').value;
-        const e = endOverride || document.getElementById('reportEndDate').value;
-        if(!s || !e) { alert('請選擇日期'); return; }
-        const d = getReportData(s, e);
-        const wb = XLSX.utils.book_new();
-
-        let detailData = [['系統序號', '日期', '收支類型', '分類', '內容 (備註)', '收入', '支出', '經手人']];
-        d.periodData.forEach(t => { detailData.push([ t.id, t.date, t.type==='income'?'收入':'支出', t.category, t.desc, t.type==='income'?parseInt(t.amount):0, t.type==='expense'?parseInt(t.amount):0, t.createdBy||'' ]); });
-        const ws1 = XLSX.utils.aoa_to_sheet(detailData); ws1['!cols'] = [{wch:15}, {wch:12}, {wch:8}, {wch:15}, {wch:30}, {wch:10}, {wch:10}, {wch:10}];
-        XLSX.utils.book_append_sheet(wb, ws1, "期間帳務明細");
-
-        let summaryData = [['統計項目', '金額', '說明', '製表時間', new Date().toLocaleString()], ['期初餘額', d.openingBalance, '', '', ''], ['', '', '', '', ''], ['【收入項目】', '金額', '', '【支出項目】', '金額']];
-        let incRows = Object.entries(d.incStats).filter(([k,v])=>v>0);
-        let expRows = Object.entries(d.expStats).filter(([k,v])=>v>0);
-        let maxR = Math.max(incRows.length, expRows.length);
-        for(let i=0; i<maxR; i++) {
-            let row = [];
-            if(i < incRows.length) { row.push(incRows[i][0], incRows[i][1]); } else { row.push('', ''); } row.push(''); 
-            if(i < expRows.length) { row.push(expRows[i][0], expRows[i][1]); } else { row.push('', ''); } summaryData.push(row);
-        }
-        summaryData.push(['', '', '', '', ''], ['收入總計', d.totalInc, '', '支出總計', d.totalExp], ['', '', '', '', ''], ['本期結餘', d.openingBalance + d.totalInc - d.totalExp, '(= 期初 + 收入 - 支出)', '', '']);
-        const ws2 = XLSX.utils.aoa_to_sheet(summaryData); ws2['!cols'] = [{wch:20}, {wch:12}, {wch:5}, {wch:20}, {wch:12}];
-        XLSX.utils.book_append_sheet(wb, ws2, "收支匯整總表");
-        XLSX.writeFile(wb, `高登科靜修校_報表_${s}_${e}.xlsx`);
-    }
-
-    // 🔥 新增：匯出操作紀錄 (Log Export)
     function exportLogs() {
         if (!cloudLogs || cloudLogs.length === 0) { alert('無紀錄可匯出'); return; }
         const now = new Date();
         const timestamp = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
         const filename = `${timestamp}-操作記錄.xlsx`;
-
         const sheetData = cloudLogs.map(log => ({ '時間': log.time, '操作者': log.user, '動作': log.action, '詳情': log.detail }));
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(sheetData);
-        ws['!cols'] = [{wch:20}, {wch:15}, {wch:15}, {wch:50}];
-        XLSX.utils.book_append_sheet(wb, ws, "操作記錄");
-        XLSX.writeFile(wb, filename);
+        const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(sheetData); ws['!cols'] = [{wch:20}, {wch:15}, {wch:15}, {wch:50}];
+        XLSX.utils.book_append_sheet(wb, ws, "操作記錄"); XLSX.writeFile(wb, filename);
     }
 </script>
 </body>
